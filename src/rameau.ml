@@ -67,17 +67,27 @@ let list_box_line song =
   let artist = label (Song.artist song) in
   (I.void 1 1 <|> id <|> I.void 1 1 <|> title <|> I.void 1 1 <|> artist)
 
-let list_box client (w, h as size) =
+let playlist_to_strings playlist =
+  List.map (fun song ->
+    let id = string_of_int (Song.id song) in
+    let title = Song.title song in
+    let artist = Song.artist song in
+    (id, title, artist)
+  ) playlist
+
+let draw_list_box client (w, h as size) =
   MpdLwtQueue.playlist client
   >>= function
-  | MpdLwtQueue.PlaylistError message -> let img = error_panel message size in
+  | MpdLwtQueue.PlaylistError message -> let img = Widgets.error_panel message size in
     Lwt.return img
-  | MpdLwtQueue.Playlist playlist -> let img = list_box playlist list_box_line (3, 2, 2, 2) in
+  | MpdLwtQueue.Playlist playlist -> Lwt.return playlist
+    >>= fun p ->
+    let img = Widgets.list_box (playlist_to_strings p) in
     Lwt.return img
 
 
 let draw term client =
-  list_box client (LwtTerm.size term)
+  draw_list_box client (LwtTerm.size term)
   >>= fun content ->
     let conn_banner = top_right_conn_banner term client in
     Lwt.return I.((tab_outline A.(fg lightred ) term "Current Playlist")
@@ -91,24 +101,28 @@ let rec main term (x, y as pos) client =
   draw term client
   >>= fun img ->
   LwtTerm.image term img
-  >>= fun () ->
-    LwtTerm.cursor term (Some pos)
     >>= fun () ->
       Lwt_stream.get (LwtTerm.events term)
       >>= fun event ->
       match event with
-      | None -> LwtTerm.release term >>= fun () -> Lwt.return_unit
+      | None -> LwtTerm.release term
+        >>= fun () ->
+        Lwt.return_unit
       | Some (`Resize _ | #Unescape.event as x) -> match x with
         | `Key (`Escape, []) | `Key (`Uchar 67, [`Ctrl]) -> LwtTerm.release term
-          >>= fun () -> Lwt.return_unit
+          >>= fun () ->
+          Lwt.return_unit
         | `Resize (cols, rows) -> main term (cols, rows) client
-        | _ ->Lwt.return () >>= fun () -> main term pos client
+        | _ ->Lwt.return ()
+          >>= fun () -> main term pos client
 
 let launch () =
   create_client ()
   >>= function
   | None -> Lwt.return_unit
-  | Some client ->  client >>= fun c -> let t = LwtTerm.create () in
+  | Some client -> client
+    >>= fun c ->
+    let t = LwtTerm.create () in
     let size = LwtTerm.size t in
     main t size c
 
