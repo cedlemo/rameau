@@ -1,0 +1,7 @@
+(jbuild_version 1)
+
+(executable
+ ((name rameau)
+  (public_name rameau)
+  (libraries (libmpdclient lwt lwt.unix cmdliner notty notty.lwt unix)))
+)
