@@ -1,130 +1,165 @@
 (*
  * Copyright 2017 Cedric LE MOIGNE, cedlemo@gmx.com
- * This file is part of Rameau.
+ * This file is part of OCaml-libmpdclient.
  *
- * Rameau is free software: you can redistribute it and/or modify
+ * OCaml-libmpdclient is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * any later version.
  *
- * Rameau is distributed in the hope that it will be useful,
+ * OCaml-libmpdclient is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Rameau.  If not, see <http://www.gnu.org/licenses/>.
+ * along with OCaml-libmpdclient.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
+open Lwt.Infix
 open Notty
 open Notty_lwt
-open Notty.Infix
-open Lwt
-open Mpd
-open Widgets
 
-let host = "127.0.0.1"
-let port = 6600
+module Terminal = Notty_lwt.Term
 
-let create_client () =
-  Mpd.LwtConnection.initialize host port
-  >>= fun connection ->
-  match connection with
-  | None -> Lwt.return None
-  | Some (c) -> Lwt.return (Some (Mpd.LwtClient.initialize c))
+type status = {
+  timestamp : float;
+  state : Mpd.Status.state;
+  volume : int;
+  queue : Mpd.Queue_lwt.t;
+  song : int;
+}
 
+let fetch_status client =
+  Mpd.Client_lwt.status client
+  >>= fun response ->
+    match response with
+    | Error message -> Lwt.return (Error message)
+    | Ok s ->
+        let timestamp = Unix.time () in
+        let state = Mpd.Status.state s in
+        let volume = Mpd.Status.volume s in
+        let song = Mpd.Status.song s in
+        Mpd.Queue_lwt.playlist client
+        >>= fun queue ->
+          Lwt.return (Ok {timestamp; state; volume; queue; song})
 
-module LwtTerm = Notty_lwt.Term
+let update_status status client =
+  match status with
+  | Error _ -> Lwt.return status
+  | Ok s -> Mpd.Client_lwt.noidle client
+      >>= fun () ->
+        let now = Unix.time () in
+        if ((now -. s.timestamp) > 4.0) then fetch_status client
+        else Lwt.return status
 
-let tab_outline attr t tabname =
-  let tab_corners = { tl = I.uchar attr 0x256d 1 1;
-                      tr = I.uchar attr 0x256e 1 1;
-                      bl = I.uchar attr 0x2570 1 1;
-                      br = I.uchar attr 0x256f 1 1
-                    } in
-  let tab_hbar w = I.uchar attr 0x2500 w 1 in
-  let tab_vbar h = I.uchar attr 0x2502 1 h in
-  let label = I.string A.(fg lightgreen ++ bg lightblack) tabname in
-  let (lw, lh) = (I.width label, I.height label) in
-  let (w, h) = LwtTerm.size t in
-  grid [ [tab_corners.tl; label; tab_corners.tr];
-         [tab_vbar 1; I.void lw 1; tab_corners.bl; tab_hbar (w - (lw + 3)); tab_corners.tr];
-         [tab_vbar (h - 3); I.void (w - 2) 1; tab_vbar (h - 3)];
-         [tab_corners.bl; tab_hbar (w - 2); tab_corners.br]
-       ]
+let gen_state_img status =
+  let state_img = match status.state with
+    | Mpd.Status.Play -> I.(string A.(fg green) "play")
+    | Mpd.Status.Pause -> I.(string A.(fg lightblack) "Pause")
+    | Mpd.Status.Stop -> I.(string A.(fg black ++ bg lightblack) "Stop")
+    | Mpd.Status.ErrState -> I.(string A.(fg red) "State Error")
+  in
+  I.(string A.(fg white) "[state ] : " <|> state_img)
 
-let top_right_conn_banner term client =
-  let banner = Mpd.LwtClient.mpd_banner client in
-  let label = I.string A.(fg lightgreen ++ bg lightblack) banner in
-  let (lw, lh) = (I.width label, I.height label) in
-  let (w, h) = LwtTerm.size term in
-  (I.void (w - lw) 1 <|> label)
+let gen_volume_img status =
+  I.(strf ~attr:A.(fg white)   "[volume] : %d" status.volume)
 
-let list_box_line song =
-  let label str = I.string A.(fg lightwhite) str in
-  let id = label (string_of_int (Song.id song)) in
-  let title = label (Song.title song) in
-  let artist = label (Song.artist song) in
-  (I.void 1 1 <|> id <|> I.void 1 1 <|> title <|> I.void 1 1 <|> artist)
+let gen_playlist_img status (w, h) =
+  match status.queue with
+  | PlaylistError message -> Lwt.return I.(strf ~attr:A.(fg red) "Error: %s" message)
+  | Playlist songs ->
+    let gen_song_img i song =
+      let title = Mpd.Song.title song in
+      let artist = Mpd.Song.artist song in
+      if status.song = i then
+        I.(strf ~attr:A.(fg lightred ++ bg lightblack) "+ %s : %s" title artist)
+      else
+        I.(strf ~attr:A.(fg lightblack) "- %s : %s" title artist)
+    in
+    let song_imgs = List.mapi gen_song_img songs in
+    let lines = List.map (fun i ->
+      let left_margin = 4 in
+      let i_w = I.width i in
+      let remain = let r = w - (i_w + left_margin) in (max r 0) in
+      I.hpad left_margin remain i)
+      song_imgs in
+    Lwt.return I.(vcat lines)
 
-let playlist_to_strings playlist =
-  List.map (fun song ->
-    let id = string_of_int (Song.id song) in
-    let title = Song.title song in
-    let artist = Song.artist song in
-    (id, title, artist)
-  ) playlist
+let render status (w, h) =
+    match status with
+    | Error message -> Lwt.return I.(strf ~attr:A.(fg red) "[there is a pb %s]" message)
+    | Ok status -> let state_img = gen_state_img status in
+      let volume_img = gen_volume_img status in
+      gen_playlist_img status (w, h)
+      >>= fun songs_img ->
+      Lwt.return I.(state_img <-> volume_img <-> songs_img)
 
-let draw_list_box client (w, h as size) =
-  MpdLwtQueue.playlist client
-  >>= function
-  | MpdLwtQueue.PlaylistError message -> let img = Widgets.error_panel message size in
-    Lwt.return img
-  | MpdLwtQueue.Playlist playlist -> Lwt.return playlist
-    >>= fun p ->
-    let img = Widgets.list_box (playlist_to_strings p) in
-    Lwt.return img
+let listen_mpd_event client =
+  Mpd.Client_lwt.idle client >|= fun evt -> `Mpd_event evt
 
+let event term = Lwt_stream.get (Terminal.events term) >|= function
+  | Some (`Resize _ | #Unescape.event as x) -> x
+  | None -> `End
 
-let draw term client =
-  draw_list_box client (LwtTerm.size term)
-  >>= fun content ->
-    let conn_banner = top_right_conn_banner term client in
-    Lwt.return I.((tab_outline A.(fg lightred ) term "Current Playlist")
-        </>
-        conn_banner
-        </>
-        content
-     )
-
-let rec main term (x, y as pos) client =
-  draw term client
-  >>= fun img ->
-  LwtTerm.image term img
-    >>= fun () ->
-      Lwt_stream.get (LwtTerm.events term)
-      >>= fun event ->
-      match event with
-      | None -> LwtTerm.release term
-        >>= fun () ->
-        Lwt.return_unit
-      | Some (`Resize _ | #Unescape.event as x) -> match x with
-        | `Key (`Escape, []) | `Key (`Uchar 67, [`Ctrl]) -> LwtTerm.release term
+let rec loop term (e, t) dim client status =
+  (e <?> t) >>= function
+  | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl]) ->
+      Mpd.Client_lwt.close client
+  | `Mpd_event event_name ->
+      fetch_status client
+      >>= fun status' ->
+        render status' dim
+        >>= fun img ->
+          Terminal.image term img
           >>= fun () ->
-          Lwt.return_unit
-        | `Resize (cols, rows) -> main term (cols, rows) client
-        | _ ->Lwt.return ()
-          >>= fun () -> main term pos client
+            loop term (e, listen_mpd_event client) dim client status'
+  | `Resize dim ->
+      update_status status client
+      >>= fun status' ->
+        render status' dim
+        >>= fun img ->
+          Terminal.image term img
+          >>= fun () ->
+            loop term (event term, t) dim client status'
+  | _ ->
+      update_status status client
+      >>= fun status' ->
+        render status' dim
+        >>= fun img ->
+          Terminal.image term img
+          >>= fun () ->
+            loop term (event term, t) dim client status'
 
-let launch () =
-  create_client ()
-  >>= function
-  | None -> Lwt.return_unit
-  | Some client -> client
-    >>= fun c ->
-    let t = LwtTerm.create () in
-    let size = LwtTerm.size t in
-    main t size c
+let interface client =
+  let term = Terminal.create () in
+  let size = Terminal.size term in
+  fetch_status client
+  >>= fun result_status ->
+    render result_status size
+    >>= fun img ->
+      Terminal.image term img
+      >>= fun () ->
+        loop term (event term, listen_mpd_event client) size client result_status
+
+let run host port =
+  let open Mpd in
+  let main_thread =
+    Mpd.Connection_lwt.initialize host port
+    >>= fun connection ->
+      Mpd.Client_lwt.initialize connection
+      >>= fun client ->
+        interface client
+  in
+  Lwt_main.run (
+    Lwt.catch
+      (fun () -> main_thread)
+      (function
+        | Mpd.Connection_lwt.Lwt_unix_exn message ->
+            Lwt_io.write_line Lwt_io.stderr message
+        | _ -> Lwt_io.write_line Lwt_io.stderr "Exception not handled. Exit ..."
+      )
+  )
 
 let () =
-    Lwt_main.run @@ launch ()
+  (run "127.0.0.1" 6600)
