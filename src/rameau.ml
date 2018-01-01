@@ -65,17 +65,19 @@ let gen_state_img status =
 let gen_volume_img status =
   I.(strf ~attr:A.(fg white)   "[volume] : %d" status.volume)
 
-let gen_playlist_img status (w, h) =
+let gen_playlist_img selected status (w, h) =
   match status.queue with
   | PlaylistError message -> Lwt.return I.(strf ~attr:A.(fg red) "Error: %s" message)
   | Playlist songs ->
     let gen_song_img i song =
       let title = Mpd.Song.title song in
       let artist = Mpd.Song.artist song in
-      if status.song = i then
-        I.(strf ~attr:A.(fg lightred ++ bg lightblack) "+ %s : %s" title artist)
-      else
-        I.(strf ~attr:A.(fg lightblack) "- %s : %s" title artist)
+      if selected = i then
+        I.(strf ~attr:A.(fg red ++ bg black) "+ %s : %s" title artist)
+      else if status.song = i then
+          I.(strf ~attr:A.(fg lightred ++ bg lightblack) "+ %s : %s" title artist)
+        else
+          I.(strf ~attr:A.(fg lightblack) "- %s : %s" title artist)
     in
     let song_imgs = List.mapi gen_song_img songs in
     let lines = List.map (fun i ->
@@ -86,12 +88,12 @@ let gen_playlist_img status (w, h) =
       song_imgs in
     Lwt.return I.(vcat lines)
 
-let render status (w, h) =
+let render status selected (w, h) =
     match status with
     | Error message -> Lwt.return I.(strf ~attr:A.(fg red) "[there is a pb %s]" message)
     | Ok status -> let state_img = gen_state_img status in
       let volume_img = gen_volume_img status in
-      gen_playlist_img status (w, h)
+      gen_playlist_img selected status (w, h)
       >>= fun songs_img ->
       Lwt.return I.(state_img <-> volume_img <-> songs_img)
 
@@ -102,45 +104,67 @@ let event term = Lwt_stream.get (Terminal.events term) >|= function
   | Some (`Resize _ | #Unescape.event as x) -> x
   | None -> `End
 
-let rec loop term (e, t) dim client status =
+let result_status_playlist_length = function
+  | Error _ -> -1
+  | Ok status -> match status.queue with | Playlist p -> List.length p | _ -> 0
+
+let rec loop term (e, t) dim client status selected =
   (e <?> t) >>= function
   | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl]) ->
       Mpd.Client_lwt.close client
   | `Mpd_event event_name ->
       fetch_status client
       >>= fun status' ->
-        render status' dim
+        render status' selected dim
         >>= fun img ->
           Terminal.image term img
           >>= fun () ->
-            loop term (e, listen_mpd_event client) dim client status'
+            loop term (e, listen_mpd_event client) dim client status' selected
   | `Resize dim ->
       update_status status client
       >>= fun status' ->
-        render status' dim
+        render status' selected dim
         >>= fun img ->
           Terminal.image term img
           >>= fun () ->
-            loop term (event term, t) dim client status'
-  | _ ->
+            loop term (event term, t) dim client status' selected
+  | `Key (`ASCII 'j', []) -> let pl_len = result_status_playlist_length status in
+  let sel = if selected + 1 >= pl_len then 0 else selected + 1
+  in update_status status client
+      >>= fun status' ->
+        render status' selected dim
+        >>= fun img ->
+          Terminal.image term img
+          >>= fun () ->
+            loop term (event term, t) dim client status'  sel
+  | `Key (`ASCII 'k', []) -> let pl_len = result_status_playlist_length status in
+  let sel = if selected - 1 < 0 then pl_len else selected - 1
+  in update_status status client
+      >>= fun status' ->
+        render status' selected dim
+        >>= fun img ->
+          Terminal.image term img
+          >>= fun () ->
+            loop term (event term, t) dim client status'  sel
+| _ ->
       update_status status client
       >>= fun status' ->
-        render status' dim
+        render status' selected dim
         >>= fun img ->
           Terminal.image term img
           >>= fun () ->
-            loop term (event term, t) dim client status'
+            loop term (event term, t) dim client status' selected
 
 let interface client =
   let term = Terminal.create () in
   let size = Terminal.size term in
   fetch_status client
   >>= fun result_status ->
-    render result_status size
+    render result_status 0 size
     >>= fun img ->
       Terminal.image term img
       >>= fun () ->
-        loop term (event term, listen_mpd_event client) size client result_status
+        loop term (event term, listen_mpd_event client) size client result_status 0
 
 let run host port =
   let open Mpd in
