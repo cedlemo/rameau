@@ -117,6 +117,14 @@ let rameau_stop client status =
     ignore(Mpd.Playback_lwt.stop client));
   Lwt.return_unit
 
+let rameau_toggle_pause client status =
+  if status.state = Mpd.Status.Pause then
+    ignore(Mpd.Playback_lwt.pause client false)
+  else
+    ignore(Mpd.Playback_lwt.pause client true)
+  ;
+  Lwt.return_unit
+
 let rec loop term (e, t) dim client status selected =
   (e <?> t) >>= function
   | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl]) ->
@@ -175,6 +183,17 @@ let rec loop term (e, t) dim client status selected =
           Mpd.Client_lwt.noidle client
           >>= fun () ->
             rameau_stop client s
+            >>= fun () ->
+              loop term (event term, t) dim client status selected
+      )
+  )
+  | `Key (`ASCII 'p', []) -> (
+      match status with
+      | Error _ -> loop term (event term, t) dim client status selected
+      | Ok s -> (
+          Mpd.Client_lwt.noidle client
+          >>= fun () ->
+            rameau_toggle_pause client s
             >>= fun () ->
               loop term (event term, t) dim client status selected
       )

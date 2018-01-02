@@ -11,3 +11,4 @@ with Notty and OCaml-libmpdclient.
  * j/k -> next / previous song in the queue list
  * Enter -> play the selected song
  * s -> stop playing
+ * p -> toggle pause
