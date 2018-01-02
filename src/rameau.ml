@@ -50,7 +50,7 @@ let update_status status client =
   | Ok s -> Mpd.Client_lwt.noidle client
       >>= fun () ->
         let now = Unix.time () in
-        if ((now -. s.timestamp) > 4.0) then fetch_status client
+        if ((now -. s.timestamp) > 1.0) then fetch_status client
         else Lwt.return status
 
 let gen_state_img status =
@@ -108,6 +108,15 @@ let result_status_playlist_length = function
   | Error _ -> -1
   | Ok status -> match status.queue with | Playlist p -> List.length p | _ -> 0
 
+let rameau_play client status selected =
+  ignore(Mpd.Playback_lwt.play client selected);
+  Lwt.return_unit
+
+let rameau_stop client status =
+  if status.state = Mpd.Status.Play then (
+    ignore(Mpd.Playback_lwt.stop client));
+  Lwt.return_unit
+
 let rec loop term (e, t) dim client status selected =
   (e <?> t) >>= function
   | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl]) ->
@@ -128,32 +137,53 @@ let rec loop term (e, t) dim client status selected =
           Terminal.image term img
           >>= fun () ->
             loop term (event term, t) dim client status' selected
-  | `Key (`ASCII 'j', []) -> let pl_len = result_status_playlist_length status in
-  let sel = if selected + 1 >= pl_len then 0 else selected + 1
-  in update_status status client
+  | `Key (`ASCII 'j', []) ->
+      let pl_len = result_status_playlist_length status in
+      let sel = if selected + 1 >= pl_len then 0 else selected + 1
+      in update_status status client
+      >>= fun status' ->
+        render status' selected dim
+        >>= fun img ->
+          Terminal.image term img
+          >>= fun () ->
+            loop term (event term, t) dim client status' sel
+  | `Key (`ASCII 'k', []) ->
+      let pl_len = result_status_playlist_length status in
+      let sel = if selected - 1 < 0 then pl_len - 1 else selected - 1
+      in update_status status client
       >>= fun status' ->
         render status' selected dim
         >>= fun img ->
           Terminal.image term img
           >>= fun () ->
             loop term (event term, t) dim client status'  sel
-  | `Key (`ASCII 'k', []) -> let pl_len = result_status_playlist_length status in
-  let sel = if selected - 1 < 0 then pl_len else selected - 1
-  in update_status status client
-      >>= fun status' ->
-        render status' selected dim
-        >>= fun img ->
-          Terminal.image term img
+  | `Key (`Enter, []) -> (
+      match status with
+      | Error _ -> loop term (event term, t) dim client status selected
+      | Ok s -> (
+          Mpd.Client_lwt.noidle client
           >>= fun () ->
-            loop term (event term, t) dim client status'  sel
-| _ ->
-      update_status status client
-      >>= fun status' ->
-        render status' selected dim
-        >>= fun img ->
-          Terminal.image term img
+            rameau_play client s selected
+            >>= fun () ->
+              loop term (event term, t) dim client status selected
+      )
+  )
+  | `Key (`ASCII 's', []) -> (
+      match status with
+      | Error _ -> loop term (event term, t) dim client status selected
+      | Ok s -> (
+          Mpd.Client_lwt.noidle client
           >>= fun () ->
-            loop term (event term, t) dim client status' selected
+            rameau_stop client s
+            >>= fun () ->
+              loop term (event term, t) dim client status selected
+      )
+  )
+  | _ -> render status selected dim
+         >>= fun img ->
+           Terminal.image term img
+           >>= fun () ->
+             loop term (event term, t) dim client status selected
 
 let interface client =
   let term = Terminal.create () in
