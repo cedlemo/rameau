@@ -109,21 +109,29 @@ let result_status_playlist_length = function
   | Ok status -> match status.queue with | Playlist p -> List.length p | _ -> 0
 
 let rameau_play client status selected =
-  ignore(Mpd.Playback_lwt.play client selected);
-  Lwt.return_unit
+  Mpd.Client_lwt.noidle client
+  >>= fun _ ->
+    Mpd.Playback_lwt.play client selected
+    >>= fun _ -> Lwt.return_unit
 
 let rameau_stop client status =
   if status.state = Mpd.Status.Play then (
-    ignore(Mpd.Playback_lwt.stop client));
-  Lwt.return_unit
+    Mpd.Client_lwt.noidle client
+    >>= fun _ ->
+      Mpd.Playback_lwt.stop client
+      >>= fun _ -> Lwt.return_unit
+  )
+  else Lwt.return_unit
 
 let rameau_toggle_pause client status =
-  if status.state = Mpd.Status.Pause then
-    ignore(Mpd.Playback_lwt.pause client false)
-  else
-    ignore(Mpd.Playback_lwt.pause client true)
-  ;
-  Lwt.return_unit
+  Mpd.Client_lwt.noidle client
+  >>= fun _ -> (
+    if status.state = Mpd.Status.Pause then
+      Mpd.Playback_lwt.pause client false
+    else
+      Mpd.Playback_lwt.pause client true
+    )
+    >>= fun _ -> Lwt.return_unit
 
 let rec loop term (e, t) dim client status selected =
   (e <?> t) >>= function
@@ -169,8 +177,6 @@ let rec loop term (e, t) dim client status selected =
       match status with
       | Error _ -> loop term (event term, t) dim client status selected
       | Ok s -> (
-          Mpd.Client_lwt.noidle client
-          >>= fun () ->
             rameau_play client s selected
             >>= fun () ->
               loop term (event term, t) dim client status selected
@@ -180,8 +186,6 @@ let rec loop term (e, t) dim client status selected =
       match status with
       | Error _ -> loop term (event term, t) dim client status selected
       | Ok s -> (
-          Mpd.Client_lwt.noidle client
-          >>= fun () ->
             rameau_stop client s
             >>= fun () ->
               loop term (event term, t) dim client status selected
@@ -191,8 +195,6 @@ let rec loop term (e, t) dim client status selected =
       match status with
       | Error _ -> loop term (event term, t) dim client status selected
       | Ok s -> (
-          Mpd.Client_lwt.noidle client
-          >>= fun () ->
             rameau_toggle_pause client s
             >>= fun () ->
               loop term (event term, t) dim client status selected
