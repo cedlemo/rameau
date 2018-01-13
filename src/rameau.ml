@@ -22,13 +22,7 @@ open Notty_lwt
 
 module Terminal = Notty_lwt.Term
 
-type status = {
-  timestamp : float;
-  state : Mpd.Status.state;
-  volume : int;
-  queue : Mpd.Queue_lwt.t;
-  song : int;
-}
+open Rameau_types
 
 let fetch_status client =
   Mpd.Client_lwt.status client
@@ -121,46 +115,6 @@ let result_status_playlist_length = function
   | Error _ -> -1
   | Ok status -> match status.queue with | Playlist p -> List.length p | _ -> 0
 
-let rameau_play client status selected =
-  Mpd.Client_lwt.noidle client
-  >>= fun _ ->
-    Mpd.Playback_lwt.play client selected
-    >>= fun _ -> Lwt.return_unit
-
-let rameau_stop client status =
-  if status.state = Mpd.Status.Play then (
-    Mpd.Client_lwt.noidle client
-    >>= fun _ ->
-      Mpd.Playback_lwt.stop client
-      >>= fun _ -> Lwt.return_unit
-  )
-  else Lwt.return_unit
-
-let rameau_toggle_pause client status =
-  Mpd.Client_lwt.noidle client
-  >>= fun _ -> (
-    if status.state = Mpd.Status.Pause then
-      Mpd.Playback_lwt.pause client false
-    else
-      Mpd.Playback_lwt.pause client true
-    )
-    >>= fun _ -> Lwt.return_unit
-
-let rameau_inc_vol client status =
-  if status.volume < 100 then
-    Mpd.Client_lwt.noidle client
-    >>= fun _ ->
-      Mpd.Playback_options_lwt.setvol client (status.volume + 1)
-      >>= fun _ -> Lwt.return_unit
-  else Lwt.return_unit
-
-let rameau_decr_vol client status =
-  if status.volume > 0 then
-    Mpd.Client_lwt.noidle client
-    >>= fun _ ->
-      Mpd.Playback_options_lwt.setvol client (status.volume - 1)
-      >>= fun _ -> Lwt.return_unit
-  else Lwt.return_unit
 
 let rec loop term (e, t) dim client status selected =
   (e <?> t) >>= function
@@ -206,7 +160,7 @@ let rec loop term (e, t) dim client status selected =
       match status with
       | Error _ -> loop term (event term, t) dim client status selected
       | Ok s -> (
-            rameau_play client s selected
+            Commands.rameau_play client s selected
             >>= fun () ->
               loop term (event term, t) dim client status selected
       )
@@ -215,7 +169,7 @@ let rec loop term (e, t) dim client status selected =
       match status with
       | Error _ -> loop term (event term, t) dim client status selected
       | Ok s -> (
-            rameau_stop client s
+            Commands.rameau_stop client s
             >>= fun () ->
               loop term (event term, t) dim client status selected
       )
@@ -224,7 +178,7 @@ let rec loop term (e, t) dim client status selected =
       match status with
       | Error _ -> loop term (event term, t) dim client status selected
       | Ok s -> (
-            rameau_toggle_pause client s
+            Commands.rameau_toggle_pause client s
             >>= fun () ->
               loop term (event term, t) dim client status selected
       )
@@ -233,7 +187,7 @@ let rec loop term (e, t) dim client status selected =
       match status with
       | Error _ -> loop term (event term, t) dim client status selected
       | Ok s -> (
-            rameau_inc_vol client s
+            Commands.rameau_inc_vol client s
             >>= fun () ->
               loop term (event term, t) dim client status selected
       )
@@ -242,7 +196,7 @@ let rec loop term (e, t) dim client status selected =
       match status with
       | Error _ -> loop term (event term, t) dim client status selected
       | Ok s -> (
-            rameau_decr_vol client s
+            Commands.rameau_decr_vol client s
             >>= fun () ->
               loop term (event term, t) dim client status selected
       )
