@@ -86,10 +86,10 @@ let build_song_line song current selected term_width =
   in
   I.hcat [
     I.(hsnap ~align:`Left (perc 20. term_width) (string attr artist));
-    I.(hsnap ~align:`Left (perc 40. term_width) (string attr title));
-    I.(hsnap ~align:`Left (perc 30. term_width) (string attr album));
+    I.(hsnap ~align:`Left (perc 50. term_width) (string attr title));
+    I.(hsnap ~align:`Left (perc 20. term_width) (string attr album));
     I.(hsnap ~align:`Middle (perc 5. term_width) (string attr track));
-    I.(hsnap ~align:`Left (perc 5. term_width) (string attr (string_of_float time)));
+    I.(hsnap ~align:`Right (perc 5. term_width) (string attr (string_of_float time)));
   ]
 
 let gen_playlist_img selected status (w, h) =
@@ -145,6 +145,22 @@ let rameau_toggle_pause client status =
       Mpd.Playback_lwt.pause client true
     )
     >>= fun _ -> Lwt.return_unit
+
+let rameau_inc_vol client status =
+  if status.volume < 100 then
+    Mpd.Client_lwt.noidle client
+    >>= fun _ ->
+      Mpd.Playback_options_lwt.setvol client (status.volume + 1)
+      >>= fun _ -> Lwt.return_unit
+  else Lwt.return_unit
+
+let rameau_decr_vol client status =
+  if status.volume > 0 then
+    Mpd.Client_lwt.noidle client
+    >>= fun _ ->
+      Mpd.Playback_options_lwt.setvol client (status.volume - 1)
+      >>= fun _ -> Lwt.return_unit
+  else Lwt.return_unit
 
 let rec loop term (e, t) dim client status selected =
   (e <?> t) >>= function
@@ -209,6 +225,24 @@ let rec loop term (e, t) dim client status selected =
       | Error _ -> loop term (event term, t) dim client status selected
       | Ok s -> (
             rameau_toggle_pause client s
+            >>= fun () ->
+              loop term (event term, t) dim client status selected
+      )
+  )
+  | `Key (`ASCII '+', []) -> (
+      match status with
+      | Error _ -> loop term (event term, t) dim client status selected
+      | Ok s -> (
+            rameau_inc_vol client s
+            >>= fun () ->
+              loop term (event term, t) dim client status selected
+      )
+  )
+  | `Key (`ASCII '-', []) -> (
+      match status with
+      | Error _ -> loop term (event term, t) dim client status selected
+      | Ok s -> (
+            rameau_decr_vol client s
             >>= fun () ->
               loop term (event term, t) dim client status selected
       )
