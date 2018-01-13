@@ -65,27 +65,40 @@ let gen_state_img status =
 let gen_volume_img status =
   I.(strf ~attr:A.(fg white)   "[volume] : %d" status.volume)
 
+(* artist title track album time *)
+let build_song_line song current selected term_width =
+  let norm_attr = A.(fg lightblack) in
+  let curr_attr = A.(fg lightred ++ bg lightblack) in
+  let sel_attr = A.(fg red ++ bg black) in
+  let attr = match selected, current with
+    | true, _ -> sel_attr
+    | false, true -> curr_attr
+    | false, false -> norm_attr
+  in
+  let title = Mpd.Song.title song in
+  let artist = Mpd.Song.artist song in
+  let album = Mpd.Song.album song in
+  let time = Mpd.Song.duration song in
+  let track = Mpd.Song.track song in
+  let perc p i =
+    let i' = float_of_int i in
+    int_of_float (i' *. p /. 100.)
+  in
+  I.hcat [
+    I.(hsnap ~align:`Left (perc 20. term_width) (string attr artist));
+    I.(hsnap ~align:`Left (perc 40. term_width) (string attr title));
+    I.(hsnap ~align:`Left (perc 30. term_width) (string attr album));
+    I.(hsnap ~align:`Middle (perc 5. term_width) (string attr track));
+    I.(hsnap ~align:`Left (perc 5. term_width) (string attr (string_of_float time)));
+  ]
+
 let gen_playlist_img selected status (w, h) =
   match status.queue with
   | PlaylistError message -> Lwt.return I.(strf ~attr:A.(fg red) "Error: %s" message)
   | Playlist songs ->
-    let gen_song_img i song =
-      let title = Mpd.Song.title song in
-      let artist = Mpd.Song.artist song in
-      if selected = i then
-        I.(strf ~attr:A.(fg red ++ bg black) "+ %s : %s" title artist)
-      else if status.song = i then
-          I.(strf ~attr:A.(fg lightred ++ bg lightblack) "+ %s : %s" title artist)
-        else
-          I.(strf ~attr:A.(fg lightblack) "- %s : %s" title artist)
-    in
-    let song_imgs = List.mapi gen_song_img songs in
-    let lines = List.map (fun i ->
-      let left_margin = 4 in
-      let i_w = I.width i in
-      let remain = let r = w - (i_w + left_margin) in (max r 0) in
-      I.hpad left_margin remain i)
-      song_imgs in
+    let lines = List.mapi (fun i song ->
+      build_song_line song (status.song = i) (selected = i) w
+    ) songs in
     Lwt.return I.(vcat lines)
 
 let render status selected (w, h) =
