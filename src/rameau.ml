@@ -69,6 +69,11 @@ let build_song_line song current selected term_width =
     | false, true -> curr_attr
     | false, false -> norm_attr
   in
+  let duration_to_string d =
+    let m = mod_float d 60. in
+    let min = int_of_float ((d -. m) /. 60.) in
+    let sec = int_of_float m in
+    Printf.sprintf "%d:%d" min sec in
   let title = Mpd.Song.title song in
   let artist = Mpd.Song.artist song in
   let album = Mpd.Song.album song in
@@ -83,7 +88,7 @@ let build_song_line song current selected term_width =
     I.(hsnap ~align:`Left (perc 50. term_width) (string attr title));
     I.(hsnap ~align:`Left (perc 20. term_width) (string attr album));
     I.(hsnap ~align:`Middle (perc 5. term_width) (string attr track));
-    I.(hsnap ~align:`Right (perc 5. term_width) (string attr (string_of_float time)));
+    I.(hsnap ~align:`Right (perc 5. term_width) (string attr (duration_to_string time)));
   ]
 
 let gen_playlist_img selected status (w, h) =
