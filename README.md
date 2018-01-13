@@ -5,6 +5,13 @@ with Notty and OCaml-libmpdclient.
 
 [Jean-Philippe Rameau](https://en.wikipedia.org/wiki/Jean-Philippe_Rameau).
 
+```
+  git clone git@github.com:cedlemo/OCaml-libmpdclient.git
+  opam pin add libmpdclient libmpdclient
+  git clone git@github.com:cedlemo/rameau.git
+  opam pin add rameau rameau
+  rameau
+```
 
 # Controls in the Queue view.
 
