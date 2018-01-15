@@ -83,13 +83,15 @@ let build_song_line song current selected term_width =
     let i' = float_of_int i in
     int_of_float (i' *. p /. 100.)
   in
-  I.hcat [
+  let background_bar = I.(uchars attr (Array.make term_width (Uchar.of_char ' '))) in
+  let foreground_bar = I.hcat [
     I.(hsnap ~align:`Left (perc 20. term_width) (string attr artist));
     I.(hsnap ~align:`Left (perc 50. term_width) (string attr title));
     I.(hsnap ~align:`Left (perc 20. term_width) (string attr album));
     I.(hsnap ~align:`Middle (perc 5. term_width) (string attr track));
     I.(hsnap ~align:`Right (perc 5. term_width) (string attr (duration_to_string time)));
-  ]
+  ] in
+  I.(foreground_bar </> background_bar)
 
 let gen_playlist_img selected status (w, h) =
   match status.queue with
