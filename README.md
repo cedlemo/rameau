@@ -19,5 +19,5 @@ with Notty and OCaml-libmpdclient.
  * Enter -> play the selected song
  * s -> stop playing
  * p -> toggle pause
- * + -> increase by one the volume
- * - -> decrease by one the volume
+ * "+" -> increase by one the volume
+ * "-" -> decrease by one the volume
