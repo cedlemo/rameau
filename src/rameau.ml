@@ -59,6 +59,38 @@ let gen_state_img status =
 let gen_volume_img status =
   I.(strf ~attr:A.(fg white)   "[volume] : %d" status.volume)
 
+(** Assemble a list of list of Notty.image in a grid image *)
+let grid xxs = xxs |> List.map I.hcat |> I.vcat
+
+(** Organize ascii code for decorations of the same kind *)
+type ascii_corners = { tl: Notty.image; (** top left *)
+                       tr: Notty.image; (** top right *)
+                       bl: Notty.image; (** bottom left *)
+                       br: Notty.image  (** bottom right *)
+                     }
+
+let gen_title_bar status (w,h) =
+  let attr = A.(fg lightred ) in
+  let tab_corners = { tl = I.uchar attr (Uchar.of_int 0x256d) 1 1;
+                      tr = I.uchar attr (Uchar.of_int 0x256e) 1 1;
+                      bl = I.uchar attr (Uchar.of_int 0x2570) 1 1;
+                      br = I.uchar attr (Uchar.of_int 0x256f) 1 1
+                    } in
+  let tab_hbar w = I.uchar attr (Uchar.of_int 0x2500) w 1 in
+  let tab_vbar h = I.uchar attr (Uchar.of_int 0x2502) 1 h in
+  let background =
+    grid [
+         [tab_corners.tl; tab_hbar (w - 2); tab_corners.tr];
+         [tab_vbar 1    ; I.void (w - 2) 1 ; tab_vbar 1    ];
+         [tab_corners.bl; tab_hbar (w - 2); tab_corners.br];
+    ] in
+  let foreground = grid [ [I.void w 1];
+                          [I.(hcat [I.void 1 1; gen_state_img status; I.void 1 1; gen_volume_img status])];
+                          [I.void w 1]] in
+  I.(foreground </> background)
+
+
+
 (* artist title track album time *)
 let build_song_line song current selected term_width =
   let norm_attr = A.(fg lightblack) in
@@ -105,11 +137,11 @@ let gen_playlist_img selected status (w, h) =
 let render status selected (w, h) =
     match status with
     | Error message -> Lwt.return I.(strf ~attr:A.(fg red) "[there is a pb %s]" message)
-    | Ok status -> let state_img = gen_state_img status in
-      let volume_img = gen_volume_img status in
+    | Ok status ->
+        let title_bar = gen_title_bar status (w,h) in
       gen_playlist_img selected status (w, h)
       >>= fun songs_img ->
-      Lwt.return I.(state_img <-> volume_img <-> songs_img)
+      Lwt.return I.(title_bar <-> songs_img)
 
 let listen_mpd_event client =
   Mpd.Client_lwt.idle client >|= fun evt -> `Mpd_event evt
