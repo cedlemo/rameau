@@ -105,7 +105,7 @@ let build_song_line song current selected term_width =
     let m = mod_float d 60. in
     let min = int_of_float ((d -. m) /. 60.) in
     let sec = int_of_float m in
-    Printf.sprintf "%d:%d" min sec in
+    Printf.sprintf "%d:%.2d" min sec in
   let title = Mpd.Song.title song in
   let artist = Mpd.Song.artist song in
   let album = Mpd.Song.album song in
