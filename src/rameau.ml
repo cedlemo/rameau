@@ -69,7 +69,7 @@ type ascii_corners = { tl: Notty.image; (** top left *)
                        br: Notty.image  (** bottom right *)
                      }
 
-let gen_title_bar status (w,h) =
+let gen_ugly_title_bar status (w,h) =
   let attr = A.(fg lightred ) in
   let tab_corners = { tl = I.uchar attr (Uchar.of_int 0x256d) 1 1;
                       tr = I.uchar attr (Uchar.of_int 0x256e) 1 1;
@@ -89,13 +89,20 @@ let gen_title_bar status (w,h) =
                           [I.void w 1]] in
   I.(foreground </> background)
 
-
+let gen_title_bar status (w,h) =
+  let attr = A.(fg lightgreen ) in
+  let app_name = I.(string A.(fg magenta) "♯ ℛameau ♫ ") in
+  let view = I.(string A.(fg white) "< Queue >") in
+  let tab_h_dotted_bar w = I.uchar attr (Uchar.of_int 0x2508) w 1 in
+  I.(vcat [void w 1;
+           hcat [void 1 1; app_name; void 1 1; view; void 1 1; gen_state_img status; void 1 1; gen_volume_img status];
+           hcat [void 1 1; tab_h_dotted_bar (w - 2); void 1 1];])
 
 (* artist title track album time *)
 let build_song_line song current selected term_width =
   let norm_attr = A.(fg lightblack) in
-  let curr_attr = A.(fg lightred ++ bg lightblack) in
-  let sel_attr = A.(fg red ++ bg black) in
+  let curr_attr = A.(fg blue) in
+  let sel_attr = A.(fg lightblue ++ bg black) in
   let attr = match selected, current with
     | true, _ -> sel_attr
     | false, true -> curr_attr
@@ -115,13 +122,17 @@ let build_song_line song current selected term_width =
     let i' = float_of_int i in
     int_of_float (i' *. p /. 100.)
   in
+  let w = term_width - 1 in
+  let current_mark = I.(uchar attr (Uchar.of_int 0x25C8) 1 1) in
   let background_bar = I.(uchars attr (Array.make term_width (Uchar.of_char ' '))) in
   let foreground_bar = I.hcat [
-    I.(hsnap ~align:`Left (perc 20. term_width) (string attr artist));
-    I.(hsnap ~align:`Left (perc 50. term_width) (string attr title));
-    I.(hsnap ~align:`Left (perc 20. term_width) (string attr album));
-    I.(hsnap ~align:`Middle (perc 5. term_width) (string attr track));
-    I.(hsnap ~align:`Right (perc 5. term_width) (string attr (duration_to_string time)));
+    if current then current_mark else I.(void 1 1);
+    I.(void 1 1);
+    I.(hsnap ~align:`Left (perc 20. w) (string attr artist));
+    I.(hsnap ~align:`Left (perc 50. w) (string attr title));
+    I.(hsnap ~align:`Left (perc 20. w) (string attr album));
+    I.(hsnap ~align:`Middle (perc 5. w) (string attr track));
+    I.(hsnap ~align:`Right (perc 5. w) (string attr (duration_to_string time)));
   ] in
   I.(foreground_bar </> background_bar)
 
@@ -130,9 +141,12 @@ let gen_playlist_img selected status (w, h) =
   | PlaylistError message -> Lwt.return I.(strf ~attr:A.(fg red) "Error: %s" message)
   | Playlist songs ->
     let lines = List.mapi (fun i song ->
-      build_song_line song (status.song = i) (selected = i) w
+      build_song_line song (status.song = i) (selected = i) (w - 2)
     ) songs in
-    Lwt.return I.(vcat lines)
+    I.(vcat lines
+    |> hpad 1 1
+    |> vpad 1 1)
+    |> Lwt.return
 
 let render status selected (w, h) =
     match status with
