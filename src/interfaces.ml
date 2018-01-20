@@ -101,17 +101,26 @@ let build_song_line song current selected term_width =
     let i' = float_of_int i in
     int_of_float (i' *. p /. 100.)
   in
-  let w = term_width - 1 in
+  let w = term_width - 3 in
   let current_mark = I.(uchar attr (Uchar.of_int 0x25C8) 1 1) in
   let background_bar = I.(uchars attr (Array.make term_width (Uchar.of_char ' '))) in
+  let track_img = I.(string attr track) in
+  let duration_img = I.(string attr (duration_to_string time)) in
+  let sep = I.(string A.(fg lightgreen) " ⋅ ") (* 0x22C5 *) in
+  let non_fixed_width = w - ( 4 * I.(width sep) + I.((width track_img) + (width duration_img))) in
   let foreground_bar = I.hcat [
     if current then current_mark else I.(void 1 1);
+    sep;
+    I.(hsnap ~align:`Left (perc 20. non_fixed_width) (string attr artist));
+    sep;
+    I.(hsnap ~align:`Left (perc 60. non_fixed_width) (string attr title));
+    sep;
+    I.(hsnap ~align:`Left (perc 20. non_fixed_width) (string attr album));
+    sep;
+    duration_img;
+    sep;
+    track_img ;
     I.(void 1 1);
-    I.(hsnap ~align:`Left (perc 20. w) (string attr artist));
-    I.(hsnap ~align:`Left (perc 50. w) (string attr title));
-    I.(hsnap ~align:`Left (perc 20. w) (string attr album));
-    I.(hsnap ~align:`Middle (perc 5. w) (string attr track));
-    I.(hsnap ~align:`Right (perc 5. w) (string attr (duration_to_string time)));
   ] in
   I.(foreground_bar </> background_bar)
 
