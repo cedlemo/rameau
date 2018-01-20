@@ -22,33 +22,11 @@ open Notty_lwt
 
 module Terminal = Notty_lwt.Term
 
-open Rameau_types
+open Types
+open Types.Internal_data
 
-let fetch_status client =
-  Mpd.Client_lwt.status client
-  >>= fun response ->
-    match response with
-    | Error message -> Lwt.return (Error message)
-    | Ok s ->
-        let timestamp = Unix.time () in
-        let state = Mpd.Status.state s in
-        let volume = Mpd.Status.volume s in
-        let song = Mpd.Status.song s in
-        Mpd.Queue_lwt.playlist client
-        >>= fun queue ->
-          Lwt.return (Ok {timestamp; state; volume; queue; song})
-
-let update_status status client =
-  match status with
-  | Error _ -> Lwt.return status
-  | Ok s -> Mpd.Client_lwt.noidle client
-      >>= fun () ->
-        let now = Unix.time () in
-        if ((now -. s.timestamp) > 1.0) then fetch_status client
-        else Lwt.return status
-
-let gen_state_img status =
-  let state_img = match status.state with
+let gen_state_img idata =
+  let state_img = match idata.state with
     | Mpd.Status.Play -> I.(string A.(fg green) "play")
     | Mpd.Status.Pause -> I.(string A.(fg lightblack) "Pause")
     | Mpd.Status.Stop -> I.(string A.(fg black ++ bg lightblack) "Stop")
@@ -56,8 +34,8 @@ let gen_state_img status =
   in
   I.(string A.(fg white) "[state ] : " <|> state_img)
 
-let gen_volume_img status =
-  I.(strf ~attr:A.(fg white)   "[volume] : %d" status.volume)
+let gen_volume_img idata =
+  I.(strf ~attr:A.(fg white)   "[volume] : %d" idata.volume)
 
 (** Assemble a list of list of Notty.image in a grid image *)
 let grid xxs = xxs |> List.map I.hcat |> I.vcat
@@ -69,7 +47,7 @@ type ascii_corners = { tl: Notty.image; (** top left *)
                        br: Notty.image  (** bottom right *)
                      }
 
-let gen_ugly_title_bar status (w,h) =
+let gen_ugly_title_bar idata (w,h) =
   let attr = A.(fg lightred ) in
   let tab_corners = { tl = I.uchar attr (Uchar.of_int 0x256d) 1 1;
                       tr = I.uchar attr (Uchar.of_int 0x256e) 1 1;
@@ -85,17 +63,17 @@ let gen_ugly_title_bar status (w,h) =
          [tab_corners.bl; tab_hbar (w - 2); tab_corners.br];
     ] in
   let foreground = grid [ [I.void w 1];
-                          [I.(hcat [I.void 1 1; gen_state_img status; I.void 1 1; gen_volume_img status])];
+                          [I.(hcat [I.void 1 1; gen_state_img idata; I.void 1 1; gen_volume_img idata])];
                           [I.void w 1]] in
   I.(foreground </> background)
 
-let gen_title_bar status (w,h) =
+let gen_title_bar idata (w,h) =
   let attr = A.(fg lightgreen ) in
   let app_name = I.(string A.(fg magenta) "♯ ℛameau ♫ ") in
   let view = I.(string A.(fg white) "< Queue >") in
   let tab_h_dotted_bar w = I.uchar attr (Uchar.of_int 0x2508) w 1 in
   I.(vcat [void w 1;
-           hcat [void 1 1; app_name; void 1 1; view; void 1 1; gen_state_img status; void 1 1; gen_volume_img status];
+           hcat [void 1 1; app_name; void 1 1; view; void 1 1; gen_state_img idata; void 1 1; gen_volume_img idata];
            hcat [void 1 1; tab_h_dotted_bar (w - 2); void 1 1];])
 
 (* artist title track album time *)
@@ -136,24 +114,24 @@ let build_song_line song current selected term_width =
   ] in
   I.(foreground_bar </> background_bar)
 
-let gen_playlist_img selected status (w, h) =
-  match status.queue with
+let gen_playlist_img selected idata (w, h) =
+  match idata.queue with
   | PlaylistError message -> Lwt.return I.(strf ~attr:A.(fg red) "Error: %s" message)
   | Playlist songs ->
     let lines = List.mapi (fun i song ->
-      build_song_line song (status.song = i) (selected = i) (w - 2)
+      build_song_line song (idata.song = i) (selected = i) (w - 2)
     ) songs in
     I.(vcat lines
     |> hpad 1 1
     |> vpad 1 1)
     |> Lwt.return
 
-let render status selected (w, h) =
-    match status with
+let render idata selected (w, h) =
+    match idata with
     | Error message -> Lwt.return I.(strf ~attr:A.(fg red) "[there is a pb %s]" message)
-    | Ok status ->
-        let title_bar = gen_title_bar status (w,h) in
-      gen_playlist_img selected status (w, h)
+    | Ok idata' ->
+        let title_bar = gen_title_bar idata' (w,h) in
+      gen_playlist_img selected idata' (w, h)
       >>= fun songs_img ->
       Lwt.return I.(title_bar <-> songs_img)
 
@@ -168,108 +146,107 @@ let result_status_playlist_length = function
   | Error _ -> -1
   | Ok status -> match status.queue with | Playlist p -> List.length p | _ -> 0
 
-
-let rec loop term (e, t) dim client status selected =
+let rec loop term (e, t) dim client idata selected =
   (e <?> t) >>= function
   | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl]) ->
       Mpd.Client_lwt.close client
   | `Mpd_event event_name ->
-      fetch_status client
-      >>= fun status' ->
-        render status' selected dim
+      Internal_data.fetch client
+      >>= fun idata' ->
+        render idata' selected dim
         >>= fun img ->
           Terminal.image term img
           >>= fun () ->
-            loop term (e, listen_mpd_event client) dim client status' selected
+            loop term (e, listen_mpd_event client) dim client idata' selected
   | `Resize dim ->
-      update_status status client
-      >>= fun status' ->
-        render status' selected dim
+      Internal_data.update idata client
+      >>= fun idata' ->
+        render idata' selected dim
         >>= fun img ->
           Terminal.image term img
           >>= fun () ->
-            loop term (event term, t) dim client status' selected
+            loop term (event term, t) dim client idata' selected
   | `Key (`ASCII 'j', []) ->
-      let pl_len = result_status_playlist_length status in
+      let pl_len = result_status_playlist_length idata in
       let sel = if selected + 1 >= pl_len then 0 else selected + 1
-      in update_status status client
-      >>= fun status' ->
-        render status' selected dim
+      in Internal_data.update idata client
+      >>= fun idata' ->
+        render idata' selected dim
         >>= fun img ->
           Terminal.image term img
           >>= fun () ->
-            loop term (event term, t) dim client status' sel
+            loop term (event term, t) dim client idata' sel
   | `Key (`ASCII 'k', []) ->
-      let pl_len = result_status_playlist_length status in
+      let pl_len = result_status_playlist_length idata in
       let sel = if selected - 1 < 0 then pl_len - 1 else selected - 1
-      in update_status status client
-      >>= fun status' ->
-        render status' selected dim
+      in Internal_data.update idata client
+      >>= fun idata' ->
+        render idata' selected dim
         >>= fun img ->
           Terminal.image term img
           >>= fun () ->
-            loop term (event term, t) dim client status'  sel
+            loop term (event term, t) dim client idata'  sel
   | `Key (`Enter, []) -> (
-      match status with
-      | Error _ -> loop term (event term, t) dim client status selected
-      | Ok s -> (
-            Commands.rameau_play client s selected
+      match idata with
+      | Error _ -> loop term (event term, t) dim client idata selected
+      | Ok d -> (
+            Commands.rameau_play client d selected
             >>= fun () ->
-              loop term (event term, t) dim client status selected
+              loop term (event term, t) dim client idata selected
       )
   )
   | `Key (`ASCII 's', []) -> (
-      match status with
-      | Error _ -> loop term (event term, t) dim client status selected
-      | Ok s -> (
-            Commands.rameau_stop client s
+      match idata with
+      | Error _ -> loop term (event term, t) dim client idata selected
+      | Ok d -> (
+            Commands.rameau_stop client d
             >>= fun () ->
-              loop term (event term, t) dim client status selected
+              loop term (event term, t) dim client idata selected
       )
   )
   | `Key (`ASCII 'p', []) -> (
-      match status with
-      | Error _ -> loop term (event term, t) dim client status selected
-      | Ok s -> (
-            Commands.rameau_toggle_pause client s
+      match idata with
+      | Error _ -> loop term (event term, t) dim client idata selected
+      | Ok d -> (
+            Commands.rameau_toggle_pause client d
             >>= fun () ->
-              loop term (event term, t) dim client status selected
+              loop term (event term, t) dim client idata selected
       )
   )
   | `Key (`ASCII '+', []) -> (
-      match status with
-      | Error _ -> loop term (event term, t) dim client status selected
-      | Ok s -> (
-            Commands.rameau_inc_vol client s
+      match idata with
+      | Error _ -> loop term (event term, t) dim client idata selected
+      | Ok d -> (
+            Commands.rameau_inc_vol client d
             >>= fun () ->
-              loop term (event term, t) dim client status selected
+              loop term (event term, t) dim client idata selected
       )
   )
   | `Key (`ASCII '-', []) -> (
-      match status with
-      | Error _ -> loop term (event term, t) dim client status selected
+      match idata with
+      | Error _ -> loop term (event term, t) dim client idata selected
       | Ok s -> (
             Commands.rameau_decr_vol client s
             >>= fun () ->
-              loop term (event term, t) dim client status selected
+              loop term (event term, t) dim client idata selected
       )
   )
-  | _ -> render status selected dim
+  | _ -> render idata selected dim
          >>= fun img ->
            Terminal.image term img
            >>= fun () ->
-             loop term (event term, t) dim client status selected
+             loop term (event term, t) dim client idata selected
 
 let interface client =
   let term = Terminal.create () in
   let size = Terminal.size term in
-  fetch_status client
-  >>= fun result_status ->
-    render result_status 0 size
+  Internal_data.fetch client
+  >>= fun idata ->
+    render idata 0 size
     >>= fun img ->
       Terminal.image term img
       >>= fun () ->
-        loop term (event term, listen_mpd_event client) size client result_status 0
+        loop term (event term, listen_mpd_event client) size client idata 0
 
 let run host port =
   let open Mpd in
