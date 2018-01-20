@@ -8,6 +8,11 @@ with Notty and OCaml-libmpdclient.
 
 <a href="https://raw.github.com/cedlemo/rameau/master/screenshot.png"><img src="https://raw.github.com/cedlemo/rameau/master/screenshot.png" alt="Rameau Preview"></a>
 
+## Installation
+
+Rameau is not finished. For now just the Queue view is working. You can play,
+stop, pause and select a song the already filled current playlist.
+
 ```
   git clone git@github.com:cedlemo/OCaml-libmpdclient.git
   opam pin add libmpdclient libmpdclient
@@ -16,7 +21,7 @@ with Notty and OCaml-libmpdclient.
   rameau
 ```
 
-# Controls in the Queue view.
+## Controls in the Queue view.
 
  * j/k -> next / previous song in the queue list
  * Enter -> play the selected song
