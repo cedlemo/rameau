@@ -23,9 +23,9 @@ open Types.Internal_data
 
 let gen_state_img idata =
   let state_img = match idata.state with
-    | Mpd.Status.Play -> I.(string A.(fg green) "play")
-    | Mpd.Status.Pause -> I.(string A.(fg lightblack) "Pause")
-    | Mpd.Status.Stop -> I.(string A.(fg black ++ bg lightblack) "Stop")
+    | Mpd.Status.Play -> I.(string A.(fg lightgreen) "Playing ▶️")
+    | Mpd.Status.Pause -> I.(string A.(fg lightblack) "Paused ⏸")
+    | Mpd.Status.Stop -> I.(string A.(fg yellow) "Stopped ⏹")
     | Mpd.Status.ErrState -> I.(string A.(fg red) "State Error")
   in
   I.(string A.(fg white) "[state ] : " <|> state_img)
@@ -66,10 +66,15 @@ let gen_ugly_title_bar idata (w,h) =
 let gen_title_bar idata (w,h) =
   let attr = A.(fg lightgreen ) in
   let app_name = I.(string A.(fg magenta) "♯ ℛameau ♫ ") in
-  let view = I.(string A.(fg white) "< Queue >") in
+  let view = I.(string A.(fg white) "Queue") in
+  let view_tab = I.(hcat [uchar attr (Uchar.of_int 0x23A1 (*⎡*)) 1 1; view; uchar attr (Uchar.of_int 0x23A4 (*⎤*)) 1 1]) in
   let tab_h_dotted_bar w = I.uchar attr (Uchar.of_int 0x2508) w 1 in
+  let state_img = gen_state_img idata in
+  let vol_img = gen_volume_img idata in
+  let used_width = List.fold_left (fun acc i -> (I.width i) + acc) 4 [app_name; view_tab; state_img; vol_img] in
+  let empty_width = w - used_width in
   I.(vcat [void w 1;
-           hcat [void 1 1; app_name; void 1 1; view; void 1 1; gen_state_img idata; void 1 1; gen_volume_img idata];
+           hcat [void 1 1; app_name; void 1 1; view_tab; void empty_width 1; state_img; void 1 1; vol_img];
            hcat [void 1 1; tab_h_dotted_bar (w - 2); void 1 1];])
 
 (* artist title track album time *)
