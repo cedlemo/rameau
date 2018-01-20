@@ -40,7 +40,7 @@ let result_status_playlist_length = function
 
 let rec loop term (e, t) dim client idata selected =
   (e <?> t) >>= function
-  | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl]) ->
+  | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl]) | `Key (`ASCII 'q', []) ->
       Mpd.Client_lwt.close client
   | `Mpd_event event_name ->
       Internal_data.fetch client

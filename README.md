@@ -29,6 +29,7 @@ stop, pause and select a song the already filled current playlist.
  * p -> toggle pause
  * "+" -> increase by one the volume
  * "-" -> decrease by one the volume
+ * "q" or "Escape" or "Ctrl + C" quit rameau
 
 # Unicode character list
 https://en.wikipedia.org/wiki/List_of_Unicode_characters
