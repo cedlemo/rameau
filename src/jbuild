@@ -3,5 +3,5 @@
 (executable
  ((name rameau)
   (public_name rameau)
-  (libraries (libmpdclient lwt lwt.unix cmdliner notty notty.lwt unix)))
+  (libraries (libmpdclient lwt lwt.unix cmdliner notty notty.lwt unix logs fmt logs.fmt logs.lwt)))
 )

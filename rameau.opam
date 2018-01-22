@@ -16,4 +16,5 @@ depends: [
   "cmdliner"
   "notty"
   "libmpdclient"
+  "logs"
 ]
