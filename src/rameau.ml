@@ -43,7 +43,11 @@ let rec loop term (e, t) dim client idata selected =
   | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl]) | `Key (`ASCII 'q', []) ->
       Mpd.Client_lwt.close client
   | `Mpd_event event_name ->
-      Internal_data.fetch client
+      Loggin.log "mpd idle event" >>= fun () ->
+      begin match idata with
+      | Error _ -> Internal_data.fetch client
+      | Ok d -> Internal_data.fetch ~view:d.view ~db:d.db client
+      end
       >>= fun idata' ->
         render idata' selected dim
         >>= fun img ->
@@ -59,6 +63,9 @@ let rec loop term (e, t) dim client idata selected =
           >>= fun () ->
             loop term (event term, t) dim client idata' selected
   | `Key (`ASCII 'j', []) ->
+    Loggin.log "j"
+    >>= fun () ->
+
       let pl_len = result_status_playlist_length idata in
       let sel = if selected + 1 >= pl_len then 0 else selected + 1
       in Internal_data.update idata client
@@ -123,7 +130,38 @@ let rec loop term (e, t) dim client idata selected =
               loop term (event term, t) dim client idata selected
       )
   )
-  | _ -> render idata selected dim
+  | `Key (`ASCII '1', []) -> begin
+    Loggin.log "1"
+    >>= fun () ->
+      match idata with
+      | Error _ -> loop term (event term, t) dim client idata selected
+      | Ok d -> let d' = Ok { d with view = Queue} in
+        update d' client
+      >>= fun idata' ->
+        render idata' 0 dim
+        >>= fun img ->
+          Terminal.image term img
+          >>= fun () -> loop term (event term, t) dim client idata' 0
+    end
+  | `Key (`ASCII '2', []) -> begin
+    Loggin.log "2"
+    >>= fun () ->
+      match idata with
+      | Error _ -> loop term (event term, t) dim client idata selected
+      | Ok d -> let d' = Ok { d with view = Music_db} in
+      update d' client
+      >>= fun idata' ->
+        render idata' 0 dim
+        >>= fun img ->
+          Loggin.log "post render"
+          >>= fun () ->
+            Terminal.image term img
+            >>= fun () ->
+              Loggin.log "post image term"
+              >>= fun () -> loop term (event term, t) dim client idata' 0
+    end
+  | _ -> Loggin.log "extra case in loop" >>= fun () ->
+       render idata selected dim
          >>= fun img ->
            Terminal.image term img
            >>= fun () ->
@@ -143,11 +181,13 @@ let interface client =
 let run host port =
   let open Mpd in
   let main_thread =
-    Mpd.Connection_lwt.initialize host port
-    >>= fun connection ->
-      Mpd.Client_lwt.initialize connection
-      >>= fun client ->
-        interface client
+    Loggin.setup ()
+    >>= fun () ->
+      Mpd.Connection_lwt.initialize host port
+      >>= fun connection ->
+        Mpd.Client_lwt.initialize connection
+        >>= fun client ->
+          interface client
   in
   Lwt_main.run (
     Lwt.catch

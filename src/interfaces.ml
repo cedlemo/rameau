@@ -21,6 +21,24 @@ open Notty
 open Notty_lwt
 open Types.Internal_data
 
+(**
+ * view layouts :
+ *
+ * title bar:
+ *
+ * app_name view_indicator empty_space state_indicator volume_indicator
+ * separator
+ *
+ * viewport width = term_width height = term_height - 2 (from title_bar)
+ *
+ * *)
+
+let duration_to_string d =
+  let m = mod_float d 60. in
+  let min = int_of_float ((d -. m) /. 60.) in
+  let sec = int_of_float m in
+  Printf.sprintf "%d:%.2d" min sec
+
 let gen_state_img idata =
   let state_img = match idata.state with
     | Mpd.Status.Play -> I.(string A.(fg lightgreen) "Playing ▶️")
@@ -66,7 +84,8 @@ let gen_ugly_title_bar idata (w,h) =
 let gen_title_bar idata (w,h) =
   let attr = A.(fg lightgreen ) in
   let app_name = I.(string A.(fg magenta) "♯ ℛameau ♫ ") in
-  let view = I.(string A.(fg white) "Queue") in
+  let view_name = string_of_view idata.view in
+  let view = I.(string A.(fg white) view_name) in
   let view_tab = I.(hcat [uchar attr (Uchar.of_int 0x23A1 (*⎡*)) 1 1; view; uchar attr (Uchar.of_int 0x23A4 (*⎤*)) 1 1]) in
   let tab_h_dotted_bar w = I.uchar attr (Uchar.of_int 0x2508) w 1 in
   let state_img = gen_state_img idata in
@@ -87,11 +106,6 @@ let build_song_line song current selected term_width =
     | false, true -> curr_attr
     | false, false -> norm_attr
   in
-  let duration_to_string d =
-    let m = mod_float d 60. in
-    let min = int_of_float ((d -. m) /. 60.) in
-    let sec = int_of_float m in
-    Printf.sprintf "%d:%.2d" min sec in
   let title = Mpd.Song.title song in
   let artist = Mpd.Song.artist song in
   let album = Mpd.Song.album song in
@@ -136,11 +150,32 @@ let gen_playlist_img selected idata (w, h) =
     |> vpad 1 1)
     |> Lwt.return
 
+open Mpd.Music_database_lwt
+
+let build_db_artist_line artist_info =
+  let name = artist_info.misc in
+  let song_num = string_of_int artist_info.songs in
+  let duration = duration_to_string artist_info.playtime in
+  I.hcat (List.map begin fun s ->
+    I.(string A.(fg white) s)
+  end [name; " "; song_num; " "; duration])
+
+let gen_music_list selected idata (w, h) =
+  match idata.db with
+  | [] -> I.string A.(fg red) "No artist found" |> Lwt.return
+  | _ -> let lines = List.map begin fun infos ->
+    build_db_artist_line infos
+    end idata.db in
+    I.(vcat lines) |> Lwt.return
+
 let render idata selected (w, h) =
     match idata with
     | Error message -> Lwt.return I.(strf ~attr:A.(fg red) "[there is a pb %s]" message)
     | Ok idata' ->
-        let title_bar = gen_title_bar idata' (w,h) in
-      gen_playlist_img selected idata' (w, h)
-      >>= fun songs_img ->
-      Lwt.return I.(title_bar <-> songs_img)
+      let title_bar = gen_title_bar idata' (w,h) in
+      begin
+      match idata'.view with
+      | Music_db -> Loggin.log "render Music_db view" >>= fun () -> gen_music_list selected idata' (w, h)
+      | _ -> Loggin.log "render Queue view" >>= fun () -> gen_playlist_img selected idata' (w, h)
+      end
+      >>= fun view -> Lwt.return I.(title_bar <-> view)

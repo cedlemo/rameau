@@ -20,7 +20,13 @@ open Mpd
 open Lwt.Infix
 
 module Internal_data = struct
-  type view = Queue | Help    (** Use to represent the type of interface to draw *)
+  type view = Queue | Help | Music_db   (** Use to represent the type of interface to draw *)
+
+  let string_of_view = function
+    | Queue -> "Queue"
+    | Help -> "Help"
+    | Music_db -> "Music database"
+
   type t = {
     timestamp : float;        (** Used to limit the number of request to Mpd ie: one each sec *)
     state : Mpd.Status.state; (** Mpd state Play, Stop, Pause *)
@@ -28,10 +34,11 @@ module Internal_data = struct
     queue : Mpd.Queue_lwt.t;  (** The Mpd Queue to request. *)
     song : int;               (** The current song. *)
     view : view;              (** The current view Rameau is displaying. *)
+    db: Mpd.Music_database_lwt.song_count list       (** A list of all the songs in Mpd. Used only in the Music_db view. *)
   }
 
   (** Used to get the internal data *)
-  let fetch ?view:(view=Queue) client =
+  let fetch ?(view=Queue) ?(db=[]) client =
     Mpd.Client_lwt.status client
     >>= fun response ->
       match response with
@@ -43,15 +50,35 @@ module Internal_data = struct
           let song = Mpd.Status.song d in
           Mpd.Queue_lwt.playlist client
           >>= fun queue ->
-            Lwt.return (Ok {timestamp; state; volume; queue; song; view})
+            Lwt.return (Ok {timestamp; state; volume; queue; song; view; db})
+
+  let fetch_music_db ?(view=Queue) idata client =
+    Loggin.log "fetch_music_db"
+    >>= fun () ->
+    Mpd.Music_database_lwt.count client [] ?group:(Some Mpd.Music_database_lwt.Artist) ()
+    >>= function
+      | Error _ -> Lwt.return idata (* TOFIX: *)
+      | Ok song_count ->
+        Loggin.log (Printf.sprintf "nb artiste %d" (List.length song_count))
+        >>= fun () ->
+        match idata with
+        | Error message -> Loggin.log message >>= fun () -> Lwt.return idata
+        | Ok d -> let timestamp = Unix.time () in
+            Lwt.return (Ok { d with db = song_count; view; timestamp })
 
   let update idata client =
+    let now = Unix.time () in
     match idata with
     | Error _ -> Lwt.return idata
     | Ok d -> Mpd.Client_lwt.noidle client
         >>= fun () ->
-          let now = Unix.time () in
-          if ((now -. d.timestamp) > 1.0) then fetch ~view:d.view client
-          else Lwt.return idata
+          match d.view with
+          | Queue ->
+            if ((now -. d.timestamp) > 1.0) then fetch ~view:d.view client
+            else Lwt.return idata
+          | Help -> Lwt.return idata
+          | Music_db ->
+            if ((now -. d.timestamp) > 2.0) || (d.db = []) then
+              fetch_music_db ~view:d.view idata client
+            else Lwt.return idata
 end
-
