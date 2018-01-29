@@ -153,12 +153,8 @@ let gen_playlist_img selected idata (w, h) =
 open Mpd.Music_database_lwt
 
 let build_db_artist_line artist_info =
-  let name = artist_info.misc in
-  let song_num = string_of_int artist_info.songs in
-  let duration = duration_to_string artist_info.playtime in
-  I.hcat (List.map begin fun s ->
-    I.(string A.(fg white) s)
-  end [name; " "; song_num; " "; duration])
+  let name = String.escaped artist_info in
+  I.hcat [I.(void 1 1); I.(string A.(fg white) name )]
 
 let gen_music_list selected idata (w, h) =
   match idata.db with

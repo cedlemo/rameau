@@ -34,8 +34,22 @@ module Internal_data = struct
     queue : Mpd.Queue_lwt.t;  (** The Mpd Queue to request. *)
     song : int;               (** The current song. *)
     view : view;              (** The current view Rameau is displaying. *)
-    db: Mpd.Music_database_lwt.song_count list       (** A list of all the songs in Mpd. Used only in the Music_db view. *)
+    db: string list           (** A list of all the songs in Mpd. Used only in the Music_db view. *)
   }
+
+  (**
+   * let status = { timestamp: float;
+   *                state: Mpd.Status.state;
+   *                volume: int;
+   *                song: int;
+   *                }
+   *
+   *
+   * type t =
+   * | Queue of {status: status; plist: Mpd.Queue_lwt.t; selected: int }
+   * | Music_db of {status: status; db: string list; selected: int}
+   * | Help of {status: statuts}
+   * *)
 
   (** Used to get the internal data *)
   let fetch ?(view=Queue) ?(db=[]) client =
@@ -55,7 +69,7 @@ module Internal_data = struct
   let fetch_music_db ?(view=Queue) idata client =
     Loggin.log "fetch_music_db"
     >>= fun () ->
-    Mpd.Music_database_lwt.count client [] ?group:(Some Mpd.Music_database_lwt.Artist) ()
+      Mpd.Music_database_lwt.list client Mpd.Music_database_lwt.Artist []
     >>= function
       | Error _ -> Lwt.return idata (* TOFIX: *)
       | Ok song_count ->
