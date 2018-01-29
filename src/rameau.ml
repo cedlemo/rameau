@@ -36,147 +36,171 @@ let event term = Lwt_stream.get (Terminal.events term) >|= function
 
 let result_status_playlist_length = function
   | Error _ -> -1
-  | Ok status -> match status.queue with | Playlist p -> List.length p | _ -> 0
+  | Ok data ->
+      match data with
+      | Music_db _ | Help _ -> 0
+      | Queue {status; plist; selected} -> match plist with
+                                           | Playlist p -> List.length p
+                                           | _ -> 0
 
-let rec loop term (e, t) dim client idata selected =
+let rec loop term (e, t) dim client idata =
   (e <?> t) >>= function
   | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl]) | `Key (`ASCII 'q', []) ->
       Mpd.Client_lwt.close client
-  | `Mpd_event event_name ->
-      Loggin.log "mpd idle event" >>= fun () ->
-      begin match idata with
-      | Error _ -> Internal_data.fetch client
-      | Ok d -> Internal_data.fetch ~view:d.view ~db:d.db client
-      end
-      >>= fun idata' ->
-        render idata' selected dim
-        >>= fun img ->
-          Terminal.image term img
-          >>= fun () ->
-            loop term (e, listen_mpd_event client) dim client idata' selected
-  | `Resize dim ->
+  | `Mpd_event event_name -> (
+      Loggin.log "mpd idle event"
+      >>= fun () ->
+        begin
+          match idata with
+          | Error _ -> Internal_data.create client
+          | Ok d -> Internal_data.force_update d client
+        end
+        >>= fun idata' ->
+          render idata' dim
+          >>= fun img ->
+            Terminal.image term img
+            >>= fun () ->
+              let events = (e, listen_mpd_event client) in
+              loop term events dim client idata')
+  | `Resize dim -> (
       Internal_data.update idata client
       >>= fun idata' ->
-        render idata' selected dim
+        render idata' dim
         >>= fun img ->
           Terminal.image term img
           >>= fun () ->
-            loop term (event term, t) dim client idata' selected
-  | `Key (`ASCII 'j', []) ->
+            loop term (event term, t) dim client idata')
+  | `Key (`ASCII 'j', []) -> (
     Loggin.log "j"
     >>= fun () ->
-
-      let pl_len = result_status_playlist_length idata in
-      let sel = if selected + 1 >= pl_len then 0 else selected + 1
-      in Internal_data.update idata client
-      >>= fun idata' ->
-        render idata' selected dim
-        >>= fun img ->
-          Terminal.image term img
-          >>= fun () ->
-            loop term (event term, t) dim client idata' sel
-  | `Key (`ASCII 'k', []) ->
-      let pl_len = result_status_playlist_length idata in
-      let sel = if selected - 1 < 0 then pl_len - 1 else selected - 1
-      in Internal_data.update idata client
-      >>= fun idata' ->
-        render idata' selected dim
-        >>= fun img ->
-          Terminal.image term img
-          >>= fun () ->
-            loop term (event term, t) dim client idata'  sel
+      match idata with
+      | Error _ -> loop term (event term, t) dim client idata
+      | Ok data ->
+          let selected = get_selected data in
+          let pl_len = get_n_elements data in
+          let sel = if selected + 1 >= pl_len then 0 else selected + 1 in
+          let d = set_selected sel data in
+          Internal_data.update (Ok d) client
+          >>= fun idata' ->
+            render idata' dim
+            >>= fun img ->
+              Terminal.image term img
+              >>= fun () ->
+                loop term (event term, t) dim client idata' )
+  | `Key (`ASCII 'k', []) -> (
+      match idata with
+      | Error _ -> loop term (event term, t) dim client idata
+      | Ok data ->
+          let selected = get_selected data in
+          let pl_len = get_n_elements data in
+          let sel = if selected - 1 < 0 then pl_len - 1 else selected - 1 in
+          let d = set_selected sel data in
+          Internal_data.update (Ok d) client
+          >>= fun idata' ->
+            render idata' dim
+            >>= fun img ->
+              Terminal.image term img
+              >>= fun () ->
+                loop term (event term, t) dim client idata')
   | `Key (`Enter, []) -> (
       match idata with
-      | Error _ -> loop term (event term, t) dim client idata selected
+      | Error _ -> loop term (event term, t) dim client idata
       | Ok d -> (
-            Commands.rameau_play client d selected
+            Commands.rameau_play client d
             >>= fun () ->
-              loop term (event term, t) dim client idata selected
+              loop term (event term, t) dim client idata
       )
   )
   | `Key (`ASCII 's', []) -> (
       match idata with
-      | Error _ -> loop term (event term, t) dim client idata selected
+      | Error _ -> loop term (event term, t) dim client idata
       | Ok d -> (
             Commands.rameau_stop client d
             >>= fun () ->
-              loop term (event term, t) dim client idata selected
+              loop term (event term, t) dim client idata
       )
   )
   | `Key (`ASCII 'p', []) -> (
       match idata with
-      | Error _ -> loop term (event term, t) dim client idata selected
+      | Error _ -> loop term (event term, t) dim client idata
       | Ok d -> (
             Commands.rameau_toggle_pause client d
             >>= fun () ->
-              loop term (event term, t) dim client idata selected
+              loop term (event term, t) dim client idata
       )
   )
   | `Key (`ASCII '+', []) -> (
       match idata with
-      | Error _ -> loop term (event term, t) dim client idata selected
+      | Error _ -> loop term (event term, t) dim client idata
       | Ok d -> (
             Commands.rameau_inc_vol client d
             >>= fun () ->
-              loop term (event term, t) dim client idata selected
+              loop term (event term, t) dim client idata
       )
   )
   | `Key (`ASCII '-', []) -> (
       match idata with
-      | Error _ -> loop term (event term, t) dim client idata selected
+      | Error _ -> loop term (event term, t) dim client idata
       | Ok s -> (
             Commands.rameau_decr_vol client s
             >>= fun () ->
-              loop term (event term, t) dim client idata selected
+              loop term (event term, t) dim client idata
       )
   )
   | `Key (`ASCII '1', []) -> begin
     Loggin.log "1"
     >>= fun () ->
       match idata with
-      | Error _ -> loop term (event term, t) dim client idata selected
-      | Ok d -> let d' = Ok { d with view = Queue} in
-        update d' client
-      >>= fun idata' ->
-        render idata' 0 dim
-        >>= fun img ->
-          Terminal.image term img
-          >>= fun () -> loop term (event term, t) dim client idata' 0
+      | Error _ -> loop term (event term, t) dim client idata
+      | Ok d ->
+          Mpd.Client_lwt.noidle client
+          >>= fun () ->
+            Internal_data.create ~view:Internal_data.Queue_view client
+            >>= fun idata' ->
+              render idata' dim
+              >>= fun img ->
+                Terminal.image term img
+                >>= fun () ->
+                  loop term (event term, t) dim client idata'
     end
   | `Key (`ASCII '2', []) -> begin
     Loggin.log "2"
     >>= fun () ->
       match idata with
-      | Error _ -> loop term (event term, t) dim client idata selected
-      | Ok d -> let d' = Ok { d with view = Music_db} in
-      update d' client
-      >>= fun idata' ->
-        render idata' 0 dim
-        >>= fun img ->
-          Loggin.log "post render"
+      | Error _ -> loop term (event term, t) dim client idata
+      | Ok d ->
+          Mpd.Client_lwt.noidle client
           >>= fun () ->
-            Terminal.image term img
-            >>= fun () ->
-              Loggin.log "post image term"
-              >>= fun () -> loop term (event term, t) dim client idata' 0
+            Internal_data.create ~view:Internal_data.Music_db_view client
+            >>= fun idata' ->
+              render idata' dim
+              >>= fun img ->
+                Loggin.log "post render"
+                >>= fun () ->
+                  Terminal.image term img
+                  >>= fun () ->
+                    Loggin.log "post image term"
+                    >>= fun () ->
+                      loop term (event term, t) dim client idata'
     end
   | _ -> Loggin.log "extra case in loop" >>= fun () ->
-       render idata selected dim
+       render idata dim
          >>= fun img ->
            Terminal.image term img
            >>= fun () ->
-             loop term (event term, t) dim client idata selected
+             loop term (event term, t) dim client idata
 
 let interface client =
   let term = Terminal.create () in
   let size = Terminal.size term in
-  Internal_data.fetch client
-  >>= fun idata ->
-    render idata 0 size
+  Internal_data.create client
+  >>= fun internal_data ->
+    render internal_data size
     >>= fun img ->
       Terminal.image term img
       >>= fun () ->
-        loop term (event term, listen_mpd_event client) size client idata 0
+        let events = event term, listen_mpd_event client in
+        loop term events size client internal_data
 
 let run host port =
   let open Mpd in
