@@ -54,122 +54,110 @@ let rec loop term (e, t) dim client idata =
   (e <?> t) >>= function
   | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl]) | `Key (`ASCII 'q', []) ->
       Mpd.Client_lwt.close client
-  | `Mpd_event event_name ->
-      begin Loggin.log "Mpd idle event"
-      >>= fun () ->
-        begin match idata with
+  | `Mpd_event event_name -> begin
+    begin match idata with
           | Error _ -> Internal_data.create client
           | Ok d -> Internal_data.force_update d client
-        end
+    end
+    >>= fun idata' ->
+      let events = (e, listen_mpd_event client) in
+      render_and_loop term events idata' dim client
+    end
+  | `Resize dim -> begin
+    Internal_data.update idata client
         >>= fun idata' ->
-          let events = (e, listen_mpd_event client) in
-          render_and_loop term events idata' dim client
-      end
-  | `Resize dim ->
-      begin Internal_data.update idata client
-      >>= fun idata' ->
-        render_and_loop term (event term, t) idata' dim client
-      end
-  | `Key (`ASCII 'j', []) ->
-      begin Loggin.log "j"
-      >>= fun () ->
-        match idata with
-        | Error _ -> loop term (event term, t) dim client idata
-        | Ok data ->
-            let selected = get_selected data in
-            let pl_len = get_n_elements data in
-            let sel = if selected + 1 >= pl_len then 0 else selected + 1 in
-            let d = set_selected sel data in
-            Internal_data.update (Ok d) client
+          render_and_loop term (event term, t) idata' dim client
+  end
+  | `Key (`ASCII 'j', []) -> begin
+    match idata with
+    | Error _ -> loop term (event term, t) dim client idata
+    | Ok data ->
+        let selected = get_selected data in
+        let pl_len = get_n_elements data in
+        let sel = if selected + 1 >= pl_len then 0 else selected + 1 in
+        let d = set_selected sel data in
+        Internal_data.update (Ok d) client
+        >>= fun idata' ->
+          render_and_loop term (event term, t) idata' dim client
+  end
+  | `Key (`ASCII 'k', []) -> begin
+    match idata with
+    | Error _ -> loop term (event term, t) dim client idata
+    | Ok data ->
+        let selected = get_selected data in
+        let pl_len = get_n_elements data in
+        let sel = if selected - 1 < 0 then pl_len - 1 else selected - 1 in
+        let d = set_selected sel data in
+        Internal_data.update (Ok d) client
+        >>= fun idata' ->
+          render_and_loop term (event term, t) idata' dim client
+  end
+  | `Key (`Enter, []) -> begin
+    match idata with
+    | Error _ -> loop term (event term, t) dim client idata
+    | Ok d -> (
+          Commands.rameau_play client d
+          >>= fun () ->
+            loop term (event term, t) dim client idata
+    )
+  end
+  | `Key (`ASCII 's', []) -> begin
+    match idata with
+    | Error _ -> loop term (event term, t) dim client idata
+    | Ok d -> (
+          Commands.rameau_stop client d
+          >>= fun () ->
+            loop term (event term, t) dim client idata
+    )
+  end
+  | `Key (`ASCII 'p', []) -> begin
+    match idata with
+    | Error _ -> loop term (event term, t) dim client idata
+    | Ok d -> (
+          Commands.rameau_toggle_pause client d
+          >>= fun () ->
+            loop term (event term, t) dim client idata
+    )
+  end
+  | `Key (`ASCII '+', []) -> begin
+    match idata with
+    | Error _ -> loop term (event term, t) dim client idata
+    | Ok d -> (
+          Commands.rameau_inc_vol client d
+          >>= fun () ->
+            loop term (event term, t) dim client idata
+    )
+  end
+  | `Key (`ASCII '-', []) -> begin
+    match idata with
+    | Error _ -> loop term (event term, t) dim client idata
+    | Ok d -> (
+          Commands.rameau_decr_vol client d
+          >>= fun () ->
+            loop term (event term, t) dim client idata
+    )
+  end
+  | `Key (`ASCII '1', []) -> begin
+      match idata with
+      | Error _ -> loop term (event term, t) dim client idata
+      | Ok d ->
+          Mpd.Client_lwt.noidle client
+          >>= fun () ->
+            Internal_data.create ~view:Internal_data.Queue_view client
             >>= fun idata' ->
               render_and_loop term (event term, t) idata' dim client
-      end
-  | `Key (`ASCII 'k', []) ->
-      begin match idata with
+  end
+  | `Key (`ASCII '2', []) -> begin
+    match idata with
       | Error _ -> loop term (event term, t) dim client idata
-      | Ok data ->
-          let selected = get_selected data in
-          let pl_len = get_n_elements data in
-          let sel = if selected - 1 < 0 then pl_len - 1 else selected - 1 in
-          let d = set_selected sel data in
-          Internal_data.update (Ok d) client
-          >>= fun idata' ->
-            render_and_loop term (event term, t) idata' dim client
-      end
-  | `Key (`Enter, []) ->
-      begin match idata with
-      | Error _ -> loop term (event term, t) dim client idata
-      | Ok d -> (
-            Commands.rameau_play client d
-            >>= fun () ->
-              loop term (event term, t) dim client idata
-      )
-      end
-  | `Key (`ASCII 's', []) ->
-      begin match idata with
-      | Error _ -> loop term (event term, t) dim client idata
-      | Ok d -> (
-            Commands.rameau_stop client d
-            >>= fun () ->
-              loop term (event term, t) dim client idata
-      )
-      end
-  | `Key (`ASCII 'p', []) ->
-      begin match idata with
-      | Error _ -> loop term (event term, t) dim client idata
-      | Ok d -> (
-            Commands.rameau_toggle_pause client d
-            >>= fun () ->
-              loop term (event term, t) dim client idata
-      )
-      end
-  | `Key (`ASCII '+', []) ->
-      begin match idata with
-      | Error _ -> loop term (event term, t) dim client idata
-      | Ok d -> (
-            Commands.rameau_inc_vol client d
-            >>= fun () ->
-              loop term (event term, t) dim client idata
-      )
-      end
-  | `Key (`ASCII '-', []) ->
-      begin match idata with
-      | Error _ -> loop term (event term, t) dim client idata
-      | Ok d -> (
-            Commands.rameau_decr_vol client d
-            >>= fun () ->
-              loop term (event term, t) dim client idata
-      )
-      end
-  | `Key (`ASCII '1', []) ->
-      begin Loggin.log "1"
-      >>= fun () ->
-        match idata with
-        | Error _ -> loop term (event term, t) dim client idata
-        | Ok d ->
-            Mpd.Client_lwt.noidle client
-            >>= fun () ->
-              Internal_data.create ~view:Internal_data.Queue_view client
-              >>= fun idata' ->
-                render_and_loop term (event term, t) idata' dim client
-      end
-  | `Key (`ASCII '2', []) ->
-      begin Loggin.log "2"
-      >>= fun () ->
-        match idata with
-        | Error _ -> loop term (event term, t) dim client idata
-        | Ok d ->
-            Mpd.Client_lwt.noidle client
-            >>= fun () ->
-              Internal_data.create ~view:Internal_data.Music_db_view client
-              >>= fun idata' ->
-                render_and_loop term (event term, t) idata' dim client
-      end
-  | _ ->
-      begin Loggin.log "extra case in loop"
-      >>= fun () ->
-        render_and_loop term (event term, t) idata dim client
-      end
+      | Ok d ->
+          Mpd.Client_lwt.noidle client
+          >>= fun () ->
+            Internal_data.create ~view:Internal_data.Music_db_view client
+            >>= fun idata' ->
+              render_and_loop term (event term, t) idata' dim client
+  end
+  | _ -> render_and_loop term (event term, t) idata dim client
 
 let interface client =
   let term = Terminal.create () in
