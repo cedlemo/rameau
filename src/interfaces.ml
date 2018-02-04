@@ -152,9 +152,13 @@ let gen_playlist_img selected plist current_song (w, h) =
     let lines = List.mapi (fun i song ->
       build_song_line song (current_song = i) (selected = i) (w - 2)
     ) songs in
+    let padding = 1 in
+    let size_diff = h - (selected + 1 + padding) in
+    let to_crop = if size_diff < 0 then abs size_diff else 0 in
     I.(vcat lines
-    |> hpad 1 1
-    |> vpad 1 1)
+    |> hpad padding padding
+    |> vpad padding padding)
+    |> I.vcrop to_crop 0
     |> Lwt.return
 
 open Mpd.Music_database_lwt
@@ -206,6 +210,7 @@ let render internal_data (w, h) =
       | Queue {status; plist; selected} ->
           Loggin.log "render Queue view"
           >>= fun () ->
-            gen_playlist_img selected plist status.song (w, h)
+            let view_port_height =  h - I.(height title_bar) in
+            gen_playlist_img selected plist status.song (w, view_port_height)
       end
       >>= fun view -> Lwt.return I.(title_bar <-> view)
