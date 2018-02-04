@@ -176,10 +176,13 @@ let gen_music_list selected db (w, h) =
   | _ -> let lines = List.mapi begin fun i infos ->
     build_db_artist_line (i = selected) infos
     end db in
-    let size_diff = h - (selected + 1) in
+    let padding = 1 in
+    let size_diff = h - (selected + 1 + padding) in
     let to_crop = if size_diff < 0 then abs size_diff else 0 in
-    I.(vcat lines)
+    I.(vcat lines
     |> I.vcrop to_crop 0
+    |> hpad padding padding
+    |> vpad padding padding)
     |> Lwt.return
 
 let gen_help_view (w, h) =
