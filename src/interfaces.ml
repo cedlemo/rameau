@@ -196,24 +196,22 @@ let gen_help_view (w, h) =
 
 let render internal_data (w, h) =
     match internal_data with
-    | Error message -> Lwt.return I.(strf ~attr:A.(fg red) "[there is a pb %s]" message)
+    | Error message ->
+        let err_message = Printf.sprintf "[render internal data]: %s" message in
+        Loggin.err err_message
+        >>= fun () ->
+          Lwt.return I.(string A.(fg red) err_message)
     | Ok data ->
       let title_bar = gen_title_bar data (w,h) in
       begin
       match data with
       | Help {status} ->
-          Loggin.log "render Help view"
-          >>= fun () ->
-            gen_help_view (w, h)
+          gen_help_view (w, h)
       | Music_db {status; db; selected} ->
-          Loggin.log "render Music_db view"
-          >>= fun () ->
-            let view_port_height =  h - I.(height title_bar) in
-            gen_music_list selected db (w, view_port_height)
+          let view_port_height =  h - I.(height title_bar) in
+          gen_music_list selected db (w, view_port_height)
       | Queue {status; plist; selected} ->
-          Loggin.log "render Queue view"
-          >>= fun () ->
-            let view_port_height =  h - I.(height title_bar) in
-            gen_playlist_img selected plist status.song (w, view_port_height)
+          let view_port_height =  h - I.(height title_bar) in
+          gen_playlist_img selected plist status.song (w, view_port_height)
       end
       >>= fun view -> Lwt.return I.(title_bar <-> view)

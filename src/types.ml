@@ -97,9 +97,7 @@ module Internal_data = struct
     Mpd.Queue_lwt.playlist client
 
   let fetch_music_db client =
-    Loggin.log "fetch_music_db"
-    >>= fun () ->
-      Mpd.Music_database_lwt.list client Mpd.Music_database_lwt.Artist []
+    Mpd.Music_database_lwt.list client Mpd.Music_database_lwt.Artist []
 
   (** Create / fill internal data. *)
   let create ?(view=Queue_view) client =

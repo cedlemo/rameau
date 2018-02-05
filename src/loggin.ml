@@ -44,6 +44,6 @@ let setup () =
   Logs.set_level (Some Debug);
   Lwt.return_unit
 
-let log message =
-  Logs_lwt.app (fun m -> m "%s" message)
+let err message =
+  Logs_lwt.err (fun m -> m "%s" message)
 
