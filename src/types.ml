@@ -34,7 +34,6 @@ module Internal_data = struct
       song: int;               (** The current song. *)
     }
 
-
   type t =
     | Queue of {status: status; plist: Mpd.Queue_lwt.t; selected: int }
     | Music_db of {status: status; db: string list; selected: int}
@@ -94,7 +93,10 @@ module Internal_data = struct
   let create ?(view=Queue_view) client =
     fetch_status client
     >>= function
-    | Error message -> Lwt.return_error message
+    | Error message ->
+        let err_message = Printf.sprintf "[create internal data][fetch status]: %s" message in
+        Loggin.err err_message
+        >>= fun () -> Lwt.return_error err_message
     | Ok status ->
         match view with
         | Help_view -> Lwt.return_ok (Help {status})
@@ -105,7 +107,10 @@ module Internal_data = struct
         | Music_db_view ->
             fetch_music_db client
             >>= function
-              | Error message -> Lwt.return_error message
+              | Error message ->
+                  let err_message = Printf.sprintf "[create internal data][fetch music db]: %s" message in
+                  Loggin.err err_message
+                  >>= fun () -> Lwt.return_error message
               | Ok db -> Lwt.return_ok (Music_db {status; db; selected = 0})
 
   (** Force to update an internal data. *)
