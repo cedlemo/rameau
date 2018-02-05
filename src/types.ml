@@ -26,22 +26,13 @@ module Internal_data = struct
     | Queue_view -> "Queue"
     | Help_view -> "Help"
     | Music_db_view -> "Music database"
-(*
-  type t = {
-    timestamp : float;        (** Used to limit the number of request to Mpd ie: one each sec *)
-    state : Mpd.Status.state; (** Mpd state Play, Stop, Pause *)
-    volume : int;             (** Mpd volume *)
-    queue : Mpd.Queue_lwt.t;  (** The Mpd Queue to request. *)
-    song : int;               (** The current song. *)
-    view : view;              (** The current view Rameau is displaying. *)
-    db: string list           (** A list of all the songs in Mpd. Used only in the Music_db view. *)
-  }
-  *)
-  type status = { timestamp: float;
-                 state: Mpd.Status.state;
-                 volume: int;
-                 song: int;
-                 }
+
+  type status =
+    { timestamp: float;        (** Used to limit the number of request to Mpd ie: one each sec *)
+      state: Mpd.Status.state; (** Mpd state Play, Stop, Pause *)
+      volume: int;             (** Mpd volume *)
+      song: int;               (** The current song. *)
+    }
 
 
   type t =
