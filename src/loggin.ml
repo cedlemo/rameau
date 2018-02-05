@@ -1,6 +1,6 @@
 open Lwt.Infix
 
-let rameau_reporter () =
+let rameau_reporter path =
   let open Logs in
   let buf_fmt ~like =
     let b = Buffer.create 512 in
@@ -15,8 +15,8 @@ let rameau_reporter () =
       let write () =
         let flags = [Unix.O_WRONLY; Unix.O_CREAT; Unix.O_APPEND] in
         let perm = 0o777 in
-        let log_file = "/home/cedlemo/Projets/OCaml/rameau.log" in
-        let err_file =  "/home/cedlemo/Projets/OCaml/rameau.err" in
+        let log_file = path ^ "/rameau.log" in
+        let err_file =  path ^ "/rameau.err" in
         Lwt_io.open_file ~flags ~perm ~mode:Lwt_io.Output log_file
         >>= fun fd_log ->
           Lwt_io.open_file ~flags ~perm ~mode:Lwt_io.Output err_file
@@ -39,10 +39,22 @@ let rameau_reporter () =
   in
   { Logs.report = report }
 
+let file_exists f = try ignore (Unix.stat f); true with _ -> false
+
 let setup () =
-  Logs.set_reporter (rameau_reporter ());
-  Logs.set_level (Some Debug);
-  Lwt.return_unit
+  try
+    let home = Sys.getenv "HOME" in
+    let config = Printf.sprintf "%s/.config" home in
+    let path = config ^ "/rameau" in
+    let _ = if not (file_exists config) then Unix.mkdir config 0o755 in
+    let _ = if not (file_exists path) then Unix.mkdir path 0o755 in
+    Logs.set_reporter (rameau_reporter path);
+    Logs.set_level (Some Debug);
+    Lwt.return_unit
+  with
+  | Not_found -> Lwt.fail_with "Unable to get the HOME env variable"
+  | Unix.Unix_error (e, _, _) -> let message = Unix.error_message e in
+      Lwt.fail_with message
 
 let err message =
   Logs_lwt.err (fun m -> m "%s" message)
