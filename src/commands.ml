@@ -27,13 +27,13 @@ let rameau_play client idata =
 
 let rameau_stop client idata =
   let status = get_status idata in
-  if status.state = Mpd.Status.Play then (
+  (* if status.state = Mpd.Status.Play then ( *)
     Mpd.Client_lwt.noidle client
     >>= fun _ ->
       Mpd.Playback_lwt.stop client
       >>= fun _ -> Lwt.return_unit
-  )
-  else Lwt.return_unit
+  (* )
+  else Lwt.return_unit *)
 
 let rameau_toggle_pause client idata =
   Mpd.Client_lwt.noidle client
