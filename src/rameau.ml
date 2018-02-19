@@ -62,100 +62,110 @@ let rec loop term (e, t) dim client idata =
     >>= fun idata' ->
       let events = (e, listen_mpd_event client) in
       render_and_loop term events idata' dim client
-    end
+  end
   | `Resize dim -> begin
+    Lwt.cancel t;
     Internal_data.update idata client
         >>= fun idata' ->
-          render_and_loop term (event term, t) idata' dim client
+          render_and_loop term (event term, listen_mpd_event client) idata' dim client
   end
   | `Key (`ASCII 'j', []) -> begin
     match idata with
     | Error _ -> loop term (event term, t) dim client idata
     | Ok data ->
+        Lwt.cancel t;
         let selected = get_selected data in
         let pl_len = get_n_elements data in
         let sel = if selected + 1 >= pl_len then 0 else selected + 1 in
         let d = set_selected sel data in
         Internal_data.update (Ok d) client
         >>= fun idata' ->
-          render_and_loop term (event term, t) idata' dim client
+          render_and_loop term (event term, listen_mpd_event client) idata' dim client
   end
   | `Key (`ASCII 'k', []) -> begin
     match idata with
     | Error _ -> loop term (event term, t) dim client idata
     | Ok data ->
+        Lwt.cancel t;
         let selected = get_selected data in
         let pl_len = get_n_elements data in
         let sel = if selected - 1 < 0 then pl_len - 1 else selected - 1 in
         let d = set_selected sel data in
         Internal_data.update (Ok d) client
         >>= fun idata' ->
-          render_and_loop term (event term, t) idata' dim client
+          render_and_loop term (event term, listen_mpd_event client) idata' dim client
   end
   | `Key (`Enter, []) -> begin
     match idata with
     | Error _ -> loop term (event term, t) dim client idata
     | Ok d -> (
-          Commands.rameau_play client d
-          >>= fun () ->
-            loop term (event term, t) dim client idata
+      Lwt.cancel t;
+      Commands.rameau_play client d
+      >>= fun () ->
+        loop term (event term, listen_mpd_event client) dim client idata
     )
   end
   | `Key (`ASCII 's', []) -> begin
     match idata with
     | Error _ -> loop term (event term, t) dim client idata
     | Ok d -> (
-          Commands.rameau_stop client d
-          >>= fun () ->
-            loop term (event term, t) dim client idata
+      Lwt.cancel t;
+      Commands.rameau_stop client d
+      >>= fun () ->
+        loop term (event term, listen_mpd_event client) dim client idata
     )
   end
   | `Key (`ASCII 'p', []) -> begin
     match idata with
     | Error _ -> loop term (event term, t) dim client idata
     | Ok d -> (
+          Lwt.cancel t;
           Commands.rameau_toggle_pause client d
           >>= fun () ->
-            loop term (event term, t) dim client idata
+            loop term (event term, listen_mpd_event client) dim client idata
     )
   end
   | `Key (`ASCII '+', []) -> begin
     match idata with
     | Error _ -> loop term (event term, t) dim client idata
     | Ok d -> (
+          Lwt.cancel t;
           Commands.rameau_inc_vol client d
           >>= fun () ->
-            loop term (event term, t) dim client idata
+            loop term (event term, listen_mpd_event client) dim client idata
     )
   end
   | `Key (`ASCII '-', []) -> begin
     match idata with
     | Error _ -> loop term (event term, t) dim client idata
     | Ok d -> (
+          Lwt.cancel t;
           Commands.rameau_decr_vol client d
           >>= fun () ->
-            loop term (event term, t) dim client idata
+            loop term (event term, listen_mpd_event client) dim client idata
     )
   end
   | `Key (`ASCII '1', []) -> begin
       match idata with
       | Error _ -> loop term (event term, t) dim client idata
       | Ok d ->
+          Lwt.cancel t;
           Mpd.Client_lwt.noidle client
-          >>= fun () ->
+          >>= fun _ ->
             Internal_data.create ~view:Internal_data.Queue_view client
             >>= fun idata' ->
-              render_and_loop term (event term, t) idata' dim client
+              render_and_loop term (event term, listen_mpd_event client) idata' dim client
   end
   | `Key (`ASCII '2', []) -> begin
     match idata with
       | Error _ -> loop term (event term, t) dim client idata
       | Ok d ->
+          Lwt.cancel t;
           Mpd.Client_lwt.noidle client
-          >>= fun () ->
+          >>= fun _ ->
             Internal_data.create ~view:Internal_data.Music_db_view client
             >>= fun idata' ->
-              render_and_loop term (event term, t) idata' dim client
+              render_and_loop term (event term, listen_mpd_event client) idata' dim client
   end
   | _ -> render_and_loop term (event term, t) idata dim client
 

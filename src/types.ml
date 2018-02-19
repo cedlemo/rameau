@@ -73,8 +73,7 @@ module Internal_data = struct
   (** Used to get the internal status *)
   let fetch_status client =
     Mpd.Client_lwt.status client
-    >>= fun response ->
-      match response with
+    >>= function
       | Error message -> Lwt.return_error message
       | Ok d ->
           let timestamp = Unix.time () in
@@ -93,24 +92,16 @@ module Internal_data = struct
   let create ?(view=Queue_view) client =
     fetch_status client
     >>= function
-    | Error message ->
-        let err_message = Printf.sprintf "[create internal data][fetch status]: %s" message in
-        Loggin.err err_message
-        >>= fun () -> Lwt.return_error err_message
+    | Error message -> Lwt.return_error message
     | Ok status ->
         match view with
         | Help_view -> Lwt.return_ok (Help {status})
-        | Queue_view ->
-            fetch_queue_list client
-              >>= fun plist ->
-                Lwt.return_ok (Queue {status; plist; selected = 0})
+        | Queue_view -> fetch_queue_list client
+              >>= fun plist -> Lwt.return_ok (Queue {status; plist; selected = 0})
         | Music_db_view ->
             fetch_music_db client
             >>= function
-              | Error message ->
-                  let err_message = Printf.sprintf "[create internal data][fetch music db]: %s" message in
-                  Loggin.err err_message
-                  >>= fun () -> Lwt.return_error message
+              | Error message -> Lwt.return_error message
               | Ok db -> Lwt.return_ok (Music_db {status; db; selected = 0})
 
   (** Force to update an internal data. *)
@@ -139,7 +130,7 @@ module Internal_data = struct
     | Error message -> Lwt.return_error message
     | Ok internal_data ->
         Mpd.Client_lwt.noidle client
-        >>= fun () ->
+        >>= fun _ ->
           match internal_data with
           | Help {status} -> Lwt.return_ok internal_data
           | Queue {status; plist; selected} ->
