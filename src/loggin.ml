@@ -56,6 +56,9 @@ let setup () =
   | Unix.Unix_error (e, _, _) -> let message = Unix.error_message e in
       Lwt.fail_with message
 
+let log message =
+  Logs_lwt.debug (fun m -> m "%s" message)
+
 let err message =
   Logs_lwt.err (fun m -> m "%s" message)
 
