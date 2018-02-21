@@ -51,6 +51,27 @@ let rec loop term (e, t) dim client idata =
       >>= fun () ->
         loop term events dim client idata
   in
+  let wrap_command command =
+    match idata with
+    | Error _ -> loop term (event term, t) dim client idata
+    | Ok d -> (
+      Lwt.cancel t;
+      command client d
+      >>= fun () ->
+        loop term (event term, listen_mpd_event client) dim client idata
+    )
+  in
+  let switch_view view =
+    match idata with
+    | Error _ -> loop term (event term, t) dim client idata
+    | Ok d ->
+        Lwt.cancel t;
+        Mpd.Client_lwt.noidle client
+        >>= fun _ ->
+          Internal_data.create ~view client
+          >>= fun idata' ->
+            render_and_loop term (event term, listen_mpd_event client) idata' dim client
+  in
   (e <?> t) >>= function
   | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl]) | `Key (`ASCII 'q', []) ->
       Mpd.Client_lwt.close client
@@ -95,78 +116,13 @@ let rec loop term (e, t) dim client idata =
         >>= fun idata' ->
           render_and_loop term (event term, listen_mpd_event client) idata' dim client
   end
-  | `Key (`Enter, []) -> begin
-    match idata with
-    | Error _ -> loop term (event term, t) dim client idata
-    | Ok d -> (
-      Lwt.cancel t;
-      Commands.rameau_play client d
-      >>= fun () ->
-        loop term (event term, listen_mpd_event client) dim client idata
-    )
-  end
-  | `Key (`ASCII 's', []) -> begin
-    match idata with
-    | Error _ -> loop term (event term, t) dim client idata
-    | Ok d -> (
-      Lwt.cancel t;
-      Commands.rameau_stop client d
-      >>= fun () ->
-        loop term (event term, listen_mpd_event client) dim client idata
-    )
-  end
-  | `Key (`ASCII 'p', []) -> begin
-    match idata with
-    | Error _ -> loop term (event term, t) dim client idata
-    | Ok d -> (
-          Lwt.cancel t;
-          Commands.rameau_toggle_pause client d
-          >>= fun () ->
-            loop term (event term, listen_mpd_event client) dim client idata
-    )
-  end
-  | `Key (`ASCII '+', []) -> begin
-    match idata with
-    | Error _ -> loop term (event term, t) dim client idata
-    | Ok d -> (
-          Lwt.cancel t;
-          Commands.rameau_inc_vol client d
-          >>= fun () ->
-            loop term (event term, listen_mpd_event client) dim client idata
-    )
-  end
-  | `Key (`ASCII '-', []) -> begin
-    match idata with
-    | Error _ -> loop term (event term, t) dim client idata
-    | Ok d -> (
-          Lwt.cancel t;
-          Commands.rameau_decr_vol client d
-          >>= fun () ->
-            loop term (event term, listen_mpd_event client) dim client idata
-    )
-  end
-  | `Key (`ASCII '1', []) -> begin
-      match idata with
-      | Error _ -> loop term (event term, t) dim client idata
-      | Ok d ->
-          Lwt.cancel t;
-          Mpd.Client_lwt.noidle client
-          >>= fun _ ->
-            Internal_data.create ~view:Internal_data.Queue_view client
-            >>= fun idata' ->
-              render_and_loop term (event term, listen_mpd_event client) idata' dim client
-  end
-  | `Key (`ASCII '2', []) -> begin
-    match idata with
-      | Error _ -> loop term (event term, t) dim client idata
-      | Ok d ->
-          Lwt.cancel t;
-          Mpd.Client_lwt.noidle client
-          >>= fun _ ->
-            Internal_data.create ~view:Internal_data.Music_db_view client
-            >>= fun idata' ->
-              render_and_loop term (event term, listen_mpd_event client) idata' dim client
-  end
+  | `Key (`Enter, [])     -> wrap_command Commands.rameau_play
+  | `Key (`ASCII 's', []) -> wrap_command Commands.rameau_stop
+  | `Key (`ASCII 'p', []) -> wrap_command Commands.rameau_toggle_pause
+  | `Key (`ASCII '+', []) -> wrap_command Commands.rameau_inc_vol
+  | `Key (`ASCII '-', []) -> wrap_command Commands.rameau_decr_vol
+  | `Key (`ASCII '1', []) -> switch_view Internal_data.Queue_view
+  | `Key (`ASCII '2', []) -> switch_view Internal_data.Music_db_view
   | _ -> render_and_loop term (event term, t) idata dim client
 
 let interface client =
