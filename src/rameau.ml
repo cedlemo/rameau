@@ -51,6 +51,9 @@ let rec loop term (e, t) dim client idata =
       >>= fun () ->
         loop term events dim client idata
   in
+  let new_events () =
+    (event term, listen_mpd_event client)
+  in
   let wrap_command command =
     match idata with
     | Error _ -> loop term (event term, t) dim client idata
@@ -58,7 +61,7 @@ let rec loop term (e, t) dim client idata =
       Lwt.cancel t;
       command client d
       >>= fun () ->
-        loop term (event term, listen_mpd_event client) dim client idata
+        loop term (new_events ()) dim client idata
     )
   in
   let switch_view view =
@@ -70,11 +73,11 @@ let rec loop term (e, t) dim client idata =
         >>= fun _ ->
           Internal_data.create ~view client
           >>= fun idata' ->
-            render_and_loop term (event term, listen_mpd_event client) idata' dim client
+            render_and_loop term (new_events ()) idata' dim client
   in
   (e <?> t) >>= function
-  | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl]) | `Key (`ASCII 'q', []) ->
-      Mpd.Client_lwt.close client
+  | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl])
+  | `Key (`ASCII 'q', []) -> Mpd.Client_lwt.close client
   | `Mpd_event event_name -> begin
     begin match idata with
           | Error _ -> Internal_data.create client
@@ -87,8 +90,8 @@ let rec loop term (e, t) dim client idata =
   | `Resize dim -> begin
     Lwt.cancel t;
     Internal_data.update idata client
-        >>= fun idata' ->
-          render_and_loop term (event term, listen_mpd_event client) idata' dim client
+      >>= fun idata' ->
+        render_and_loop term (new_events ()) idata' dim client
   end
   | `Key (`ASCII 'j', []) -> begin
     match idata with
@@ -101,7 +104,7 @@ let rec loop term (e, t) dim client idata =
         let d = set_selected sel data in
         Internal_data.update (Ok d) client
         >>= fun idata' ->
-          render_and_loop term (event term, listen_mpd_event client) idata' dim client
+          render_and_loop term (new_events ()) idata' dim client
   end
   | `Key (`ASCII 'k', []) -> begin
     match idata with
@@ -114,7 +117,7 @@ let rec loop term (e, t) dim client idata =
         let d = set_selected sel data in
         Internal_data.update (Ok d) client
         >>= fun idata' ->
-          render_and_loop term (event term, listen_mpd_event client) idata' dim client
+          render_and_loop term (new_events ()) idata' dim client
   end
   | `Key (`Enter, [])     -> wrap_command Commands.rameau_play
   | `Key (`ASCII 's', []) -> wrap_command Commands.rameau_stop

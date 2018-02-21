@@ -173,17 +173,16 @@ let build_db_artist_line is_selected artist_info =
 let gen_music_list selected db (w, h) =
   match db with
   | [] -> I.string A.(fg red) "No artist found" |> Lwt.return
-  | _ -> let lines = List.mapi begin fun i infos ->
-    build_db_artist_line (i = selected) infos
-    end db in
-    let padding = 1 in
-    let size_diff = h - (selected + 1 + padding) in
-    let to_crop = if size_diff < 0 then abs size_diff else 0 in
-    I.(vcat lines
-    |> I.vcrop to_crop 0
-    |> hpad padding padding
-    |> vpad padding padding)
-    |> Lwt.return
+  | _ -> let art_sel = selected.artist in
+      let lines = List.mapi (fun i inf -> build_db_artist_line (i = art_sel) inf) db in
+      let padding = 1 in
+      let size_diff = h - (art_sel + 1 + padding) in
+      let to_crop = if size_diff < 0 then abs size_diff else 0 in
+      I.(vcat lines
+      |> vcrop to_crop 0
+      |> hpad padding padding
+      |> vpad padding padding)
+      |> Lwt.return
 
 let gen_help_view (w, h) =
   grid [[I.(void 1 1); I.(string A.(fg white) "shortcuts"); I.(void 1 1); I.(string A.(fg white) "shortcuts");];

@@ -34,9 +34,10 @@ module Internal_data = struct
       song: int;               (** The current song. *)
     }
 
+  type music_db_selector = { artist: int; album: int; song: int }
   type t =
     | Queue of {status: status; plist: Mpd.Queue_lwt.t; selected: int }
-    | Music_db of {status: status; db: string list; selected: int}
+    | Music_db of {status: status; db: string list; selected:  music_db_selector }
     | Help of {status: status}
 
   let view_name = function
@@ -54,7 +55,7 @@ module Internal_data = struct
   let get_selected = function
     | Help {status} -> -1
     | Queue {status; plist; selected} -> selected
-    | Music_db {status; db; selected} -> selected
+    | Music_db {status; db; selected} -> selected.artist
 
   (** Get the list length. *)
   let get_n_elements = function
@@ -68,7 +69,12 @@ module Internal_data = struct
   let set_selected i = function
     | Help {status} -> Help {status}
     | Queue {status; plist; selected} -> Queue {status; plist; selected = i}
-    | Music_db {status; db; selected} -> Music_db {status; db; selected = i}
+    | Music_db {status; db; _ } -> Music_db {status;
+                                             db;
+                                             selected = { artist = i;
+                                                          album = 0;
+                                                          song = 0 }
+                                             }
 
   (** Used to get the internal status *)
   let fetch_status client =
@@ -95,14 +101,15 @@ module Internal_data = struct
     | Error message -> Lwt.return_error message
     | Ok status ->
         match view with
-        | Help_view -> Lwt.return_ok (Help {status})
+        | Help_view -> Lwt.return_ok (Help { status })
         | Queue_view -> fetch_queue_list client
-              >>= fun plist -> Lwt.return_ok (Queue {status; plist; selected = 0})
+              >>= fun plist -> Lwt.return_ok (Queue { status; plist; selected = 0 })
         | Music_db_view ->
             fetch_music_db client
             >>= function
               | Error message -> Lwt.return_error message
-              | Ok db -> Lwt.return_ok (Music_db {status; db; selected = 0})
+              | Ok db -> let selected = { artist = 0; album = 0; song = 0 } in
+              Lwt.return_ok (Music_db { status; db; selected })
 
   (** Force to update an internal data. *)
   let force_update idata client =
