@@ -23,9 +23,9 @@ open Types.Internal_data
 
 (**
  * view layouts :
- *
+   *
  * title bar:
- *
+   *
  * app_name view_indicator empty_space state_indicator volume_indicator
  * separator
  *
@@ -51,35 +51,36 @@ let gen_state_img s =
 let gen_volume_img s =
   I.(strf ~attr:A.(fg white)   "[volume] : %d" s.volume)
 
-(** Assemble a list of list of Notty.image in a grid image *)
+  (** Assemble a list of list of Notty.image in a grid image *)
 let grid xxs = xxs |> List.map I.hcat |> I.vcat
 
 (** Organize ascii code for decorations of the same kind *)
-type ascii_corners = { tl: Notty.image; (** top left *)
+type ascii_corners =
+  { tl: Notty.image; (** top left *)
                        tr: Notty.image; (** top right *)
                        bl: Notty.image; (** bottom left *)
-                       br: Notty.image  (** bottom right *)
-                     }
+                       br: Notty.image; (** bottom right *)
+}
 
 (* let gen_ugly_title_bar idata (w,h) =
   let attr = A.(fg lightred ) in
-  let tab_corners = { tl = I.uchar attr (Uchar.of_int 0x256d) 1 1;
+let tab_corners = { tl = I.uchar attr (Uchar.of_int 0x256d) 1 1;
                       tr = I.uchar attr (Uchar.of_int 0x256e) 1 1;
                       bl = I.uchar attr (Uchar.of_int 0x2570) 1 1;
                       br = I.uchar attr (Uchar.of_int 0x256f) 1 1
-                    } in
-  let tab_hbar w = I.uchar attr (Uchar.of_int 0x2500) w 1 in
-  let tab_vbar h = I.uchar attr (Uchar.of_int 0x2502) 1 h in
-  let background =
-    grid [
-         [tab_corners.tl; tab_hbar (w - 2); tab_corners.tr];
+} in
+let tab_hbar w = I.uchar attr (Uchar.of_int 0x2500) w 1 in
+let tab_vbar h = I.uchar attr (Uchar.of_int 0x2502) 1 h in
+let background =
+  grid [
+    [tab_corners.tl; tab_hbar (w - 2); tab_corners.tr];
          [tab_vbar 1    ; I.void (w - 2) 1 ; tab_vbar 1    ];
          [tab_corners.bl; tab_hbar (w - 2); tab_corners.br];
     ] in
-  let foreground = grid [ [I.void w 1];
+let foreground = grid [ [I.void w 1];
                           [I.(hcat [I.void 1 1; gen_state_img idata; I.void 1 1; gen_volume_img idata])];
                           [I.void w 1]] in
-  I.(foreground </> background)
+I.(foreground </> background)
 *)
 let gen_title_bar internal_data (w,h) =
   let _gen_title_bar s view_name =
@@ -95,13 +96,13 @@ let gen_title_bar internal_data (w,h) =
     I.(vcat [void w 1;
              hcat [void 1 1; app_name; void 1 1; view_tab; void empty_width 1; state_img; void 1 1; vol_img];
              hcat [void 1 1; tab_h_dotted_bar (w - 2); void 1 1];])
-  in
+    in
   match internal_data with
   | Help {status} -> _gen_title_bar status "Help"
   | Queue {status; plist; selected} -> _gen_title_bar status "Queue"
   | Music_db {status; db; selected} -> _gen_title_bar status "Music database"
 
-(* artist title track album time *)
+  (* artist title track album time *)
 let build_song_line song current selected term_width =
   let norm_attr = A.(fg lightblack) in
   let curr_attr = A.(fg blue) in
@@ -119,14 +120,16 @@ let build_song_line song current selected term_width =
   let perc p i =
     let i' = float_of_int i in
     int_of_float (i' *. p /. 100.)
-  in
+    in
   let w = term_width - 3 in
   let current_mark = I.(uchar attr (Uchar.of_int 0x25C8) 1 1) in
-  let background_bar = I.(uchars attr (Array.make term_width (Uchar.of_char ' '))) in
+  let space_char = Uchar.of_char ' ' in
+  let background_bar = I.(uchars attr (Array.make term_width space_char)) in
   let track_img = I.(string attr track) in
   let duration_img = I.(string attr (duration_to_string time)) in
   let sep = I.(string A.(fg lightgreen) " ⋅ ") (* 0x22C5 *) in
-  let non_fixed_width = w - ( 4 * I.(width sep) + I.((width track_img) + (width duration_img))) in
+  let non_fixed_width =
+    w - ( 4 * I.((width sep) + (width track_img) + (width duration_img))) in
   let foreground_bar = I.hcat [
     if current then current_mark else I.(void 1 1);
     sep;
@@ -140,26 +143,25 @@ let build_song_line song current selected term_width =
     sep;
     track_img ;
     I.(void 1 1);
-  ] in
+    ] in
   I.(foreground_bar </> background_bar)
 
 open Mpd.Queue_lwt
 
 let gen_playlist_img selected plist current_song (w, h) =
   match plist with
-  | PlaylistError message -> Lwt.return I.(strf ~attr:A.(fg red) "Error: %s" message)
+  | PlaylistError message ->
+      Lwt.return I.(strf ~attr:A.(fg red) "Error: %s" message)
   | Playlist songs ->
-    let lines = List.mapi (fun i song ->
-      build_song_line song (current_song = i) (selected = i) (w - 2)
-    ) songs in
-    let padding = 1 in
-    let size_diff = h - (selected + 1 + padding) in
-    let to_crop = if size_diff < 0 then abs size_diff else 0 in
-    I.(vcat lines
-    |> hpad padding padding
-    |> vpad padding padding)
-    |> I.vcrop to_crop 0
-    |> Lwt.return
+      let lines = List.mapi (fun i song ->
+        build_song_line song (current_song = i) (selected = i) (w - 2)
+        ) songs in
+      let padding = 1 in
+      let size_diff = h - (selected + 1 + padding) in
+      let to_crop = if size_diff < 0 then abs size_diff else 0 in
+      I.(vcat lines |> hpad padding padding |> vpad padding padding)
+      |> I.vcrop to_crop 0
+      |> Lwt.return
 
 open Mpd.Music_database_lwt
 
@@ -172,45 +174,49 @@ let build_db_artist_line is_selected artist_info =
 
 let gen_music_list selected db (w, h) =
   match db with
-  | [] -> I.string A.(fg red) "No artist found" |> Lwt.return
-  | _ -> let art_sel = selected.artist in
-      let lines = List.mapi (fun i inf -> build_db_artist_line (i = art_sel) inf) db in
+  | [] ->
+      I.string A.(fg red) "No artist found" |> Lwt.return
+  | _ ->
+      let art_sel = selected.artist in
+      let lines =
+        List.mapi (fun i inf -> build_db_artist_line (i = art_sel) inf) db in
       let padding = 1 in
       let size_diff = h - (art_sel + 1 + padding) in
       let to_crop = if size_diff < 0 then abs size_diff else 0 in
       I.(vcat lines
-      |> vcrop to_crop 0
-      |> hpad padding padding
-      |> vpad padding padding)
+        |> vcrop to_crop 0
+        |> hpad padding padding
+        |> vpad padding padding)
       |> Lwt.return
 
 let gen_help_view (w, h) =
-  grid [[I.(void 1 1); I.(string A.(fg white) "shortcuts"); I.(void 1 1); I.(string A.(fg white) "shortcuts");];
-        [I.(void 1 1); I.(string A.(fg white) "shortcuts"); I.(void 1 1); I.(string A.(fg white) "shortcuts");];
-        [I.(void 1 1); I.(string A.(fg white) "shortcuts"); I.(void 1 1); I.(string A.(fg white) "shortcuts");];
-        [I.(void 1 1); I.(string A.(fg white) "shortcuts"); I.(void 1 1); I.(string A.(fg white) "shortcuts");];
-        [I.(void 1 1); I.(string A.(fg white) "shortcuts"); I.(void 1 1); I.(string A.(fg white) "shortcuts");];
-  ]
+  let shortcut = I.(string A.(fg white) "shortcuts") in
+  grid [[I.(void 1 1); shortcut; I.(void 1 1); shortcut;];
+        [I.(void 1 1); shortcut; I.(void 1 1); shortcut;];
+        [I.(void 1 1); shortcut; I.(void 1 1); shortcut;];
+        [I.(void 1 1); shortcut; I.(void 1 1); shortcut;];
+        [I.(void 1 1); shortcut; I.(void 1 1); shortcut;];
+        ]
   |> Lwt.return
 
 let render internal_data (w, h) =
-    match internal_data with
+  match internal_data with
     | Error message ->
         let err_message = Printf.sprintf "[render internal data]: %s" message in
         Loggin.err err_message
         >>= fun () ->
           Lwt.return I.(string A.(fg red) err_message)
     | Ok data ->
-      let title_bar = gen_title_bar data (w,h) in
-      begin
-      match data with
-      | Help {status} ->
-          gen_help_view (w, h)
-      | Music_db {status; db; selected} ->
-          let view_port_height =  h - I.(height title_bar) in
-          gen_music_list selected db (w, view_port_height)
-      | Queue {status; plist; selected} ->
-          let view_port_height =  h - I.(height title_bar) in
-          gen_playlist_img selected plist status.song (w, view_port_height)
-      end
-      >>= fun view -> Lwt.return I.(title_bar <-> view)
+        let title_bar = gen_title_bar data (w,h) in
+        begin
+          match data with
+        | Help {status} ->
+            gen_help_view (w, h)
+        | Music_db {status; db; selected} ->
+            let view_port_height =  h - I.(height title_bar) in
+            gen_music_list selected db (w, view_port_height)
+        | Queue {status; plist; selected} ->
+            let view_port_height =  h - I.(height title_bar) in
+            gen_playlist_img selected plist status.song (w, view_port_height)
+        end
+        >>= fun view -> Lwt.return I.(title_bar <-> view)
