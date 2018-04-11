@@ -62,26 +62,6 @@ type ascii_corners =
                        br: Notty.image; (** bottom right *)
 }
 
-(* let gen_ugly_title_bar idata (w,h) =
-  let attr = A.(fg lightred ) in
-let tab_corners = { tl = I.uchar attr (Uchar.of_int 0x256d) 1 1;
-                      tr = I.uchar attr (Uchar.of_int 0x256e) 1 1;
-                      bl = I.uchar attr (Uchar.of_int 0x2570) 1 1;
-                      br = I.uchar attr (Uchar.of_int 0x256f) 1 1
-} in
-let tab_hbar w = I.uchar attr (Uchar.of_int 0x2500) w 1 in
-let tab_vbar h = I.uchar attr (Uchar.of_int 0x2502) 1 h in
-let background =
-  grid [
-    [tab_corners.tl; tab_hbar (w - 2); tab_corners.tr];
-         [tab_vbar 1    ; I.void (w - 2) 1 ; tab_vbar 1    ];
-         [tab_corners.bl; tab_hbar (w - 2); tab_corners.br];
-    ] in
-let foreground = grid [ [I.void w 1];
-                          [I.(hcat [I.void 1 1; gen_state_img idata; I.void 1 1; gen_volume_img idata])];
-                          [I.void w 1]] in
-I.(foreground </> background)
-*)
 let gen_title_bar internal_data (w,h) =
   let _gen_title_bar s view_name =
     let attr = A.(fg lightgreen ) in
