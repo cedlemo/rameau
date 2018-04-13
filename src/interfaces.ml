@@ -161,10 +161,16 @@ let gen_music_list selected db (w, h) =
       let lines =
         List.mapi (fun i inf -> build_db_artist_line (i = art_sel) inf) db in
       let padding = 1 in
-      let size_diff = h - (art_sel + 1 + padding) in
-      let to_crop = if size_diff < 0 then abs size_diff else 0 in
+      (* let h_size_diff = h - (art_sel + 1 + padding) in
+      let to_crop = if h_size_diff < 0 then abs h_size_diff else 0 in
+      let v_size_diff = w - (art_sel + 1 + padding) in
+      let v_to_crop = if v_size_diff < 0 then abs v_size_diff else 0 in *)
+      let align = `Left in
       I.(vcat lines
-        |> vcrop to_crop 0
+        (* |> vcrop to_crop 0
+        |> hcrop 0 v_to_crop *)
+        |> hsnap ~align (w - padding * 2)
+        |> vsnap (w - padding * 2)
         |> hpad padding padding
         |> vpad padding padding)
       |> Lwt.return
@@ -194,7 +200,9 @@ let render internal_data (w, h) =
             gen_help_view (w, h)
         | Music_db {status; db; selected} ->
             let view_port_height =  h - I.(height title_bar) in
-            gen_music_list selected db (w, view_port_height)
+            gen_music_list selected db ((w - 3) / 3, view_port_height)
+            >>= fun img ->
+              Lwt.return (I.hcat [img; img;img])
         | Queue {status; plist; selected} ->
             let view_port_height =  h - I.(height title_bar) in
             gen_playlist_img selected plist status.song (w, view_port_height)
