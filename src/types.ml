@@ -38,7 +38,7 @@ module Internal_data = struct
   type music_db_selector = { artist: panel; album: panel; song: panel }
   type t =
     | Queue of {status: status; plist: Mpd.Queue_lwt.t; selected: int }
-    | Music_db of {status: status; db: string list; selected:  music_db_selector }
+    | Music_db of {status: status; db: music_db_selector }
     | Help of {status: status}
 
   let view_name = function
@@ -50,13 +50,13 @@ module Internal_data = struct
   let get_status = function
     | Help {status} -> status
     | Queue {status; plist; selected} -> status
-    | Music_db {status; db; selected} -> status
+    | Music_db {status; db} -> status
 
   (** Get the selected song from the internal data. *)
   let get_selected = function
     | Help {status} -> -1
     | Queue {status; plist; selected} -> selected
-    | Music_db {status; db; selected} -> selected.artist
+    | Music_db {status; db} -> db.artist.selected
 
   (** Get the list length. *)
   let get_n_elements = function
