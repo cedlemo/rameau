@@ -98,6 +98,11 @@ module Internal_data = struct
    * list album artist \"artist name\"
    * list title album \"album name\" artist \"artist name\"
    * *)
+  let fetch_albums_in_music_db client artist =
+    Mpd.Music_database_lwt.(list client Album [(Artist, artist)])
+
+  let fetch_songs_in_music_db client artist album =
+    Mpd.Music_database_lwt.(list client Title [(Artist, artist, Album, album)])
 
   (** Create / fill internal data. *)
   let create ?(view=Queue_view) client =
