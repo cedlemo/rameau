@@ -34,7 +34,8 @@ module Internal_data = struct
       song: int;               (** The current song. *)
     }
 
-  type music_db_selector = { artist: int; album: int; song: int }
+  type panel = { items: string list; selected: int}
+  type music_db_selector = { artist: panel; album: panel; song: panel }
   type t =
     | Queue of {status: status; plist: Mpd.Queue_lwt.t; selected: int }
     | Music_db of {status: status; db: string list; selected:  music_db_selector }
@@ -93,10 +94,11 @@ module Internal_data = struct
 
   let fetch_artists_in_music_db client =
     Mpd.Music_database_lwt.list client Mpd.Music_database_lwt.Artist []
-  (* Query to implement
+  (* Queries to implement
    * list album artist \"artist name\"
    * list title album \"album name\" artist \"artist name\"
    * *)
+
   (** Create / fill internal data. *)
   let create ?(view=Queue_view) client =
     fetch_status client
