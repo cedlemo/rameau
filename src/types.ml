@@ -91,7 +91,7 @@ module Internal_data = struct
   let fetch_queue_list client =
     Mpd.Queue_lwt.playlist client
 
-  let fetch_music_db client =
+  let fetch_artists_in_music_db client =
     Mpd.Music_database_lwt.list client Mpd.Music_database_lwt.Artist []
 
   (** Create / fill internal data. *)
@@ -105,7 +105,7 @@ module Internal_data = struct
         | Queue_view -> fetch_queue_list client
               >>= fun plist -> Lwt.return_ok (Queue { status; plist; selected = 0 })
         | Music_db_view ->
-            fetch_music_db client
+            fetch_artists_in_music_db client
             >>= function
               | Error message -> Lwt.return_error message
               | Ok db -> let selected = { artist = 0; album = 0; song = 0 } in
@@ -124,7 +124,7 @@ module Internal_data = struct
               >>= fun plist ->
                 Lwt.return_ok (Queue {status; plist; selected})
         | Music_db {status = _; db; selected} ->
-            fetch_music_db client
+            fetch_artists_in_music_db client
             >>= function
               | Error message -> Lwt.return_error message
               | Ok db -> Lwt.return_ok (Music_db {status; db; selected})
@@ -158,7 +158,7 @@ module Internal_data = struct
                   | Error message -> Lwt.return_error message
                   | Ok s ->
                       begin if ((now -. prev) > 2.0) || (db = []) then
-                          fetch_music_db client
+                          fetch_artists_in_music_db client
                         else Lwt.return_ok db
                       end
                       >>= function
