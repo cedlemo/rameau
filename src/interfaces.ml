@@ -80,7 +80,7 @@ let gen_title_bar internal_data (w,h) =
   match internal_data with
   | Help {status} -> _gen_title_bar status "Help"
   | Queue {status; plist; selected} -> _gen_title_bar status "Queue"
-  | Music_db {status; db; selected} -> _gen_title_bar status "Music database"
+  | Music_db {status; db} -> _gen_title_bar status "Music database"
 
   (* artist title track album time *)
 let build_song_line song current selected term_width =
@@ -145,21 +145,20 @@ let gen_playlist_img selected plist current_song (w, h) =
 
 open Mpd.Music_database_lwt
 
-let build_db_artist_line is_selected artist_info =
+let build_pan_line is_selected artist_info =
   let sel_attr = A.(fg lightblue ++ bg black) in
   let norm_attr = A.(fg white) in
   let attr = if is_selected then sel_attr else norm_attr in
   let name = String.escaped artist_info in
   I.hcat [I.(void 1 1); I.(string attr name )]
 
-let gen_music_list selected db (w, h) =
-  match db with
+let gen_pan_list {items; selected} (w, h) =
+  match items with
   | [] ->
       I.string A.(fg red) "No artist found" |> Lwt.return
   | _ ->
-      let art_sel = selected.artist in
       let lines =
-        List.mapi (fun i inf -> build_db_artist_line (i = art_sel) inf) db in
+        List.mapi (fun i inf -> build_pan_line (i = selected) inf) items in
       let padding = 1 in
       (* let h_size_diff = h - (art_sel + 1 + padding) in
       let to_crop = if h_size_diff < 0 then abs h_size_diff else 0 in
@@ -198,11 +197,15 @@ let render internal_data (w, h) =
           match data with
         | Help {status} ->
             gen_help_view (w, h)
-        | Music_db {status; db; selected} ->
+        | Music_db {status; db} ->
             let view_port_height =  h - I.(height title_bar) in
-            gen_music_list selected db ((w - 3) / 3, view_port_height)
-            >>= fun img ->
-              Lwt.return (I.hcat [img; img;img])
+            gen_pan_list db.artist ((w - 3) / 3, view_port_height)
+            >>= fun artists ->
+              gen_pan_list db.album ((w - 3) / 3, view_port_height)
+              >>= fun albums ->
+                gen_pan_list db.song ((w - 3) / 3, view_port_height)
+                >>= fun songs ->
+                  Lwt.return (I.hcat [artists; albums; songs])
         | Queue {status; plist; selected} ->
             let view_port_height =  h - I.(height title_bar) in
             gen_playlist_img selected plist status.song (w, view_port_height)
