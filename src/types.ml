@@ -74,7 +74,7 @@ module Internal_data = struct
   (** Set selected. *)
   let set_selected (i,i',i'') = function
     | Help {status} -> Help {status}
-    | Queue {status; plist; selected} -> Queue {status; plist; selected = i'}
+    | Queue {status; plist; selected} -> Queue {status; plist; selected = i}
     | Music_db {status; db} ->
         let artist_pan = {db.artist with selected = i} in
         let album_pan = {db.album with selected = i'} in
