@@ -101,7 +101,7 @@ let rec loop term (e, t) dim client idata =
         let selected = get_selected data in
         let pl_len = get_n_elements data in
         let sel = if selected + 1 >= pl_len then 0 else selected + 1 in
-        let d = set_selected sel data in
+        let d = set_selected (sel, 0, 0) data in(* TODO : deal with 3 selectors *)
         Internal_data.update (Ok d) client
         >>= fun idata' ->
           render_and_loop term (new_events ()) idata' dim client
@@ -114,7 +114,7 @@ let rec loop term (e, t) dim client idata =
         let selected = get_selected data in
         let pl_len = get_n_elements data in
         let sel = if selected - 1 < 0 then pl_len - 1 else selected - 1 in
-        let d = set_selected sel data in
+        let d = set_selected (sel, 0, 0) data in (* TODO : deal with 3 selectors *)
         Internal_data.update (Ok d) client
         >>= fun idata' ->
           render_and_loop term (new_events ()) idata' dim client
