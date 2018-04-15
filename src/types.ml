@@ -61,21 +61,28 @@ module Internal_data = struct
   (** Get the list length. *)
   let get_n_elements = function
     | Help {status} -> -1
-    | Music_db {status; db; selected} -> List.length db
+    | Music_db {status; db} ->
+        let n_artist = List.length db.artist.items in
+        let n_album = List.length db.album.items in
+        let n_song = List.length db.song.items in
+        max n_artist n_album
+        |> max n_song
     | Queue {status; plist; selected} -> match plist with
         | PlaylistError _ -> -1
         | Playlist p -> List.length p
 
   (** Set selected. *)
-  let set_selected i = function
+  let set_selected (i,i',i'') = function
     | Help {status} -> Help {status}
-    | Queue {status; plist; selected} -> Queue {status; plist; selected = i}
-    | Music_db {status; db; _ } -> Music_db {status;
-                                             db;
-                                             selected = { artist = i;
-                                                          album = 0;
-                                                          song = 0 }
-                                             }
+    | Queue {status; plist; selected} -> Queue {status; plist; selected = i'}
+    | Music_db {status; db} ->
+        let artist_pan = {db.artist with selected = i} in
+        let album_pan = {db.album with selected = i'} in
+        let song_pan = {db.song with selected = i''} in
+        Music_db {status;
+                  db = {artist = artist_pan;
+                        album = album_pan;
+                        song = song_pan} }
 
   (** Used to get the internal status *)
   let fetch_status client =
@@ -95,14 +102,37 @@ module Internal_data = struct
   let fetch_artists_in_music_db client =
     Mpd.Music_database_lwt.list client Mpd.Music_database_lwt.Artist []
   (* Queries to implement
-   * list album artist \"artist name\"
-   * list title album \"album name\" artist \"artist name\"
+   * list album artist "artist name"
+   * list title album "album name" artist "artist name"
    * *)
   let fetch_albums_in_music_db client artist =
     Mpd.Music_database_lwt.(list client Album [(Artist, artist)])
 
   let fetch_songs_in_music_db client artist album =
-    Mpd.Music_database_lwt.(list client Title [(Artist, artist, Album, album)])
+    Mpd.Music_database_lwt.(list client Title [(Artist, artist); (Album, album)])
+
+  let fetch_music_db client artist_sel album_sel song_sel =
+    fetch_artists_in_music_db client
+    >>= function
+    | Error message -> Lwt.return_error message
+    | Ok artists ->
+        let artists_pan = { items = artists; selected = artist_sel } in
+        let artist = List.nth artists artists_pan.selected in
+        fetch_albums_in_music_db client artist
+        >>= function
+          | Error message -> Lwt.return_error message
+          | Ok albums ->
+              let albums_pan = { items = albums; selected = album_sel } in
+              let album = List.nth albums albums_pan.selected in
+              fetch_songs_in_music_db client artist album
+              >>= function
+                | Error message -> Lwt.return_error message
+                | Ok  songs ->
+                    let songs_pan = { items = songs; selected = song_sel } in
+                    let music_db =  {artist = artists_pan;
+                                     album = albums_pan;
+                                     song = songs_pan} in
+                    Lwt.return_ok music_db
 
   (** Create / fill internal data. *)
   let create ?(view=Queue_view) client =
@@ -115,11 +145,10 @@ module Internal_data = struct
         | Queue_view -> fetch_queue_list client
               >>= fun plist -> Lwt.return_ok (Queue { status; plist; selected = 0 })
         | Music_db_view ->
-            fetch_artists_in_music_db client
+            fetch_music_db client 0 0 0
             >>= function
-              | Error message -> Lwt.return_error message
-              | Ok db -> let selected = { artist = 0; album = 0; song = 0 } in
-              Lwt.return_ok (Music_db { status; db; selected })
+            | Error message -> Lwt.return_error message
+            | Ok  db -> Lwt.return_ok (Music_db { status; db })
 
   (** Force to update an internal data. *)
   let force_update idata client =
@@ -133,11 +162,11 @@ module Internal_data = struct
             fetch_queue_list client
               >>= fun plist ->
                 Lwt.return_ok (Queue {status; plist; selected})
-        | Music_db {status = _; db; selected} ->
-            fetch_artists_in_music_db client
+        | Music_db {status = _; db;} ->
+            fetch_music_db client db.artist.selected db.album.selected db.song.selected
             >>= function
               | Error message -> Lwt.return_error message
-              | Ok db -> Lwt.return_ok (Music_db {status; db; selected})
+              | Ok db -> Lwt.return_ok (Music_db {status; db})
 
   (** Update internal data but with checks for elapsed time in order to limit
    *  the number of request send to Mpd. (not every times a key is pressed. *)
@@ -160,19 +189,19 @@ module Internal_data = struct
                     | Error message -> Lwt.return_error message
                     | Ok status -> Lwt.return_ok (Queue {status; plist; selected})
               else Lwt.return_ok internal_data
-          | Music_db {status; db; selected} ->
+          | Music_db {status; db} ->
               let prev = status.timestamp in
               if ((now -. prev) > 1.0) then
                 fetch_status client
                 >>= function
                   | Error message -> Lwt.return_error message
                   | Ok s ->
-                      begin if ((now -. prev) > 2.0) || (db = []) then
-                          fetch_artists_in_music_db client
+                      begin if ((now -. prev) > 2.0) then
+                          fetch_music_db client db.artist.selected db.album.selected db.song.selected
                         else Lwt.return_ok db
                       end
                       >>= function
                         | Error message -> Lwt.return_error message
-                        | Ok db -> Lwt.return_ok (Music_db {status = s; db; selected})
+                        | Ok db -> Lwt.return_ok (Music_db {status = s; db})
               else Lwt.return_ok internal_data
 end
