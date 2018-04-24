@@ -152,22 +152,16 @@ let build_pan_line is_selected artist_info =
   let name = String.escaped artist_info in
   I.hcat [I.(void 1 1); I.(string attr name )]
 
-let gen_pan_list {items; selected} (w, h) =
+let gen_pan_list {items; selected} (w, h) empty_message =
   match items with
   | [] ->
-      I.string A.(fg red) "No artist found" |> Lwt.return
+      I.string A.(fg red) empty_message |> Lwt.return
   | _ ->
       let lines =
         List.mapi (fun i inf -> build_pan_line (i = selected) inf) items in
       let padding = 1 in
-      (* let h_size_diff = h - (art_sel + 1 + padding) in
-      let to_crop = if h_size_diff < 0 then abs h_size_diff else 0 in
-      let v_size_diff = w - (art_sel + 1 + padding) in
-      let v_to_crop = if v_size_diff < 0 then abs v_size_diff else 0 in *)
       let align = `Left in
       I.(vcat lines
-        (* |> vcrop to_crop 0
-        |> hcrop 0 v_to_crop *)
         |> hsnap ~align (w - padding * 2)
         |> vsnap (w - padding * 2)
         |> hpad padding padding
@@ -199,11 +193,11 @@ let render internal_data (w, h) =
             gen_help_view (w, h)
         | Music_db {status; db} ->
             let view_port_height =  h - I.(height title_bar) in
-            gen_pan_list db.artist ((w - 3) / 3, view_port_height)
+            gen_pan_list db.artist ((w - 3) / 3, view_port_height) "No artist(s)"
             >>= fun artists ->
-              gen_pan_list db.album ((w - 3) / 3, view_port_height)
+              gen_pan_list db.album ((w - 3) / 3, view_port_height) "No album(s)"
               >>= fun albums ->
-                gen_pan_list db.song ((w - 3) / 3, view_port_height)
+                gen_pan_list db.song ((w - 3) / 3, view_port_height) "No song(s)"
                 >>= fun songs ->
                   Lwt.return (I.hcat [artists; albums; songs])
         | Queue {status; plist; selected} ->
