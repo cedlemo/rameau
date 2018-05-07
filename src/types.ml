@@ -108,8 +108,20 @@ module Internal_data = struct
   let fetch_albums_in_music_db client artist =
     Mpd.Music_database_lwt.(list client Album [(Artist, artist)])
 
+let _ = Random.self_init ()
+
   let fetch_songs_in_music_db client artist album =
-    Mpd.Music_database_lwt.(list client Title [(Artist, artist); (Album, album)])
+    (* Mpd.Music_database_lwt.(list client Title [(Artist, artist); (Album, album)]) *)
+    let n = Random.int 15 in
+    let rec build_stub i acc =
+      if i > n then acc
+      else
+        let s = "Song " ^ (string_of_int i) in
+        build_stub (i + 1) (s :: acc)
+    in
+    if n = -1 then Lwt.return_error "nope"
+    else let bouchon = build_stub 0 [] in
+    Lwt.return_ok bouchon
 
   let fetch_music_db client artist_sel album_sel song_sel =
     fetch_artists_in_music_db client
