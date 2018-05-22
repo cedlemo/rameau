@@ -42,8 +42,8 @@ let duration_to_string d =
 let gen_state_img s =
   let state_img = match s.state with
     | Mpd.Status.Play -> I.(string A.(fg lightgreen) "Playing ▶️")
-    | Mpd.Status.Pause -> I.(string A.(fg lightblack) "Paused ⏸")
-    | Mpd.Status.Stop -> I.(string A.(fg yellow) "Stopped ⏹")
+    | Mpd.Status.Pause -> I.(string A.(fg lightblack) "Paused =")
+    | Mpd.Status.Stop -> I.(string A.(fg yellow) "Stopped ■")
     | Mpd.Status.ErrState -> I.(string A.(fg red) "State Error")
   in
   I.(string A.(fg white) "[state ] : " <|> state_img)
