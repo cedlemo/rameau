@@ -1,4 +1,4 @@
-open Types
+open Lwt.Infix
 
 (** Used to get the internal status *)
 let fetch_status client =
@@ -10,7 +10,7 @@ let fetch_status client =
         let state = Mpd.Status.state d in
         let volume = Mpd.Status.volume d in
         let song = Mpd.Status.song d in
-        Lwt.return_ok {timestamp; state; volume; song}
+        Lwt.return_ok (timestamp, state, volume, song)
 
 let fetch_queue_list client =
   Mpd.Queue_lwt.playlist client

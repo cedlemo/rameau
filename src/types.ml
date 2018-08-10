@@ -18,6 +18,7 @@
 
 open Mpd
 open Lwt.Infix
+module MDA = MpdDataAccess
 
 module Internal_data = struct
   type view = Queue_view | Help_view | Music_db_view   (** Use to represent the type of interface to draw *)
@@ -84,59 +85,20 @@ module Internal_data = struct
                         album = album_pan;
                         song = song_pan} }
 
-  (** Used to get the internal status *)
-  let fetch_status client =
-    Mpd.Client_lwt.status client
-    >>= function
-      | Error message -> Lwt.return_error message
-      | Ok d ->
-          let timestamp = Unix.time () in
-          let state = Mpd.Status.state d in
-          let volume = Mpd.Status.volume d in
-          let song = Mpd.Status.song d in
-          Lwt.return_ok {timestamp; state; volume; song}
-
-  let fetch_queue_list client =
-    Mpd.Queue_lwt.playlist client
-
-  let fetch_artists_in_music_db client =
-    Mpd.Music_database_lwt.list client Mpd.Music_database_lwt.Artist []
-  (* Queries to implement
-   * list album artist "artist name"
-   * list title album "album name" artist "artist name"
-   * *)
-  let fetch_albums_in_music_db client artist =
-    Mpd.Music_database_lwt.(list client Album [(Artist, artist)])
-
-let _ = Random.self_init ()
-
-  let fetch_songs_in_music_db client artist album =
-    (* Mpd.Music_database_lwt.(list client Title [(Artist, artist); (Album, album)]) *)
-    let n = Random.int 15 in
-    let rec build_stub i acc =
-      if i > n then acc
-      else
-        let s = "Song " ^ (string_of_int i) in
-        build_stub (i + 1) (s :: acc)
-    in
-    if n = -1 then Lwt.return_error "nope"
-    else let bouchon = build_stub 0 [] in
-    Lwt.return_ok bouchon
-
   let fetch_music_db client artist_sel album_sel song_sel =
-    fetch_artists_in_music_db client
+    MDA.fetch_artists_in_music_db client
     >>= function
     | Error message -> Lwt.return_error message
     | Ok artists ->
         let artists_pan = { items = artists; selected = artist_sel } in
         let artist = List.nth artists artists_pan.selected in
-        fetch_albums_in_music_db client artist
+        MDA.fetch_albums_in_music_db client artist
         >>= function
           | Error message -> Lwt.return_error message
           | Ok albums ->
               let albums_pan = { items = albums; selected = album_sel } in
               let album = List.nth albums albums_pan.selected in
-              fetch_songs_in_music_db client artist album
+              MDA.fetch_songs_in_music_db client artist album
               >>= function
                 | Error message -> Lwt.return_error message
                 | Ok  songs ->
@@ -148,13 +110,14 @@ let _ = Random.self_init ()
 
   (** Create / fill internal data. *)
   let create ?(view=Queue_view) client =
-    fetch_status client
+    MDA.fetch_status client
     >>= function
     | Error message -> Lwt.return_error message
-    | Ok status ->
+    | Ok (timestamp, state, volume, song) ->
+        let status = {timestamp; state; volume; song} in
         match view with
-        | Help_view -> Lwt.return_ok (Help { status })
-        | Queue_view -> fetch_queue_list client
+          | Help_view -> Lwt.return_ok (Help { status })
+        | Queue_view -> MDA.fetch_queue_list client
               >>= fun plist -> Lwt.return_ok (Queue { status; plist; selected = 0 })
         | Music_db_view ->
             fetch_music_db client 0 0 0
@@ -164,14 +127,15 @@ let _ = Random.self_init ()
 
   (** Force to update an internal data. *)
   let force_update idata client =
-    fetch_status client
+    MDA.fetch_status client
     >>= function
     | Error message -> Lwt.return_error message
-    | Ok status ->
+    | Ok (timestamp, state, volume, song) ->
+        let status = {timestamp; state; volume; song} in
         match idata with
         | Help _ -> Lwt.return_ok (Help {status})
         | Queue {status = _; plist; selected} ->
-            fetch_queue_list client
+            MDA.fetch_queue_list client
               >>= fun plist ->
                 Lwt.return_ok (Queue {status; plist; selected})
         | Music_db {status = _; db;} ->
@@ -194,20 +158,23 @@ let _ = Random.self_init ()
           | Queue {status; plist; selected} ->
               let prev = status.timestamp in
               if ((now -. prev) > 1.0) then
-                fetch_queue_list client
+                MDA.fetch_queue_list client
                 >>= fun plist ->
-                  fetch_status client
+                  MDA.fetch_status client
                   >>= function
                     | Error message -> Lwt.return_error message
-                    | Ok status -> Lwt.return_ok (Queue {status; plist; selected})
+                    | Ok (timestamp, state, volume, song) ->
+                      let status = {timestamp; state; volume; song} in
+                      Lwt.return_ok (Queue {status; plist; selected})
               else Lwt.return_ok internal_data
           | Music_db {status; db} ->
               let prev = status.timestamp in
               if ((now -. prev) > 1.0) then
-                fetch_status client
+                MDA.fetch_status client
                 >>= function
                   | Error message -> Lwt.return_error message
-                  | Ok s ->
+                  | Ok (timestamp, state, volume, song) ->
+                      let s = {timestamp; state; volume; song} in
                       begin if ((now -. prev) > 2.0) then
                           fetch_music_db client db.artist.selected db.album.selected db.song.selected
                         else Lwt.return_ok db
