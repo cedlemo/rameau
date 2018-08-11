@@ -1,7 +1,6 @@
 open Lwt.Infix
 
 let rameau_reporter path =
-  let open Logs in
   let buf_fmt ~like =
     let b = Buffer.create 512 in
     Fmt.with_buffer ~like b,
@@ -39,15 +38,9 @@ let rameau_reporter path =
   in
   { Logs.report = report }
 
-let file_exists f = try ignore (Unix.stat f); true with _ -> false
-
 let setup () =
   try
-    let home = Sys.getenv "HOME" in
-    let config = Printf.sprintf "%s/.config" home in
-    let path = config ^ "/rameau" in
-    let _ = if not (file_exists config) then Unix.mkdir config 0o755 in
-    let _ = if not (file_exists path) then Unix.mkdir path 0o755 in
+    let (_, _, path) = Utils.get_config_dirs () in
     Logs.set_reporter (rameau_reporter path);
     Logs.set_level (Some Debug);
     Lwt.return_unit
