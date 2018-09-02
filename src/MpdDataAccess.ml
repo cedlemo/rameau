@@ -1,22 +1,22 @@
 open Lwt.Infix
 
 module Song = struct
-  (** module dedicated to use encapsulate the Mpd.Song type. *)
+  (** module dedicated to use / encapsulate the Mpd.Song type. *)
   type t = {
     title : string;
     artist : string;
     album : string;
-    time : float;
-    track : int;
+    time : int;
+    track : string;
   }
 
-  let from_mpd_song (s : Mpd.Song.t) : t=
+  let from_mpd_song s =
     {
-      title = s.title;
-      artist = s.artist;
-      album = s.album;
-      time = s.time;
-      track = s.track;
+      title = Mpd.Song.title s;
+      artist = Mpd.Song.artist s;
+      album = Mpd.Song.album s;
+      time = Mpd.Song.time s;
+      track = Mpd.Song.track s;
     }
     (*
      let title = Mpd.Song.title song in
@@ -41,12 +41,12 @@ let build_random_stub prefix =
   if false then Lwt.return_error "nope" (* trick for the stub to return a Result Lwt.t. *)
   else Lwt.return_ok (build_stub 0 [])
 
-let build_random_song title_n artist_n album_n time_n track () =
+let build_random_song title_n artist_n album_n time_n track : Song.t=
     {
       title = "title" ^ (string_of_int title_n);
       artist = "artist" ^ (string_of_int artist_n);
       album = "album" ^ (string_of_int album_n);
-      time = 2.0 +. time_n;
+      time = 120 + time_n;
       track = track;
     }
 
@@ -70,9 +70,24 @@ let fetch_status client =
         let song = Mpd.Status.song d in
         Lwt.return_ok (timestamp, state, volume, song)
 
-let fetch_queue_list client =
-  (* Mpd.Queue_lwt.playlist client *)
-  build_random_stub "Playlist: song"
+let fetch_queue_list client : (Song.t list, string) result =
+  (* Mpd.Queue_lwt.playlist client
+     build_random_stub "Playlist: song"
+*)
+   Ok [{
+      title = "title1";
+      artist = "artist1";
+      album = "album1";
+      time = 120;
+      track = "1";
+    };
+    {
+      title = "title2";
+      artist = "artist2";
+      album = "album2";
+      time = 180;
+      track = "2";
+    }]
 
 let fetch_artists_in_music_db client =
   (* Mpd.Music_database_lwt.list client Mpd.Music_database_lwt.Artist [] *)
