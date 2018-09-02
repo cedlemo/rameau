@@ -38,7 +38,7 @@ module Internal_data = struct
   type panel = { items: string list; selected: int}
   type music_db_selector = { artist: panel; album: panel; song: panel }
   type t =
-    | Queue of {status: status; plist: Mpd.Queue_lwt.t; selected: int }
+    | Queue of {status: status; plist: (MDA.Song.t list, string) result; selected: int }
     | Music_db of {status: status; db: music_db_selector }
     | Help of {status: status}
 
@@ -69,8 +69,8 @@ module Internal_data = struct
         max n_artist n_album
         |> max n_song
     | Queue {status; plist; selected} -> match plist with
-        | PlaylistError _ -> -1
-        | Playlist p -> List.length p
+        | Error _ -> -1
+        | Ok p -> List.length p
 
   (** Set selected. *)
   let set_selected (i,i',i'') = function
@@ -117,7 +117,7 @@ module Internal_data = struct
         let status = {timestamp; state; volume; song} in
         match view with
           | Help_view -> Lwt.return_ok (Help { status })
-        | Queue_view -> MDA.fetch_queue_list client
+        | Queue_view -> Lwt.return (MDA.fetch_queue_list client)
               >>= fun plist -> Lwt.return_ok (Queue { status; plist; selected = 0 })
         | Music_db_view ->
             fetch_music_db client 0 0 0
@@ -135,7 +135,7 @@ module Internal_data = struct
         match idata with
         | Help _ -> Lwt.return_ok (Help {status})
         | Queue {status = _; plist; selected} ->
-            MDA.fetch_queue_list client
+            Lwt.return (MDA.fetch_queue_list client)
               >>= fun plist ->
                 Lwt.return_ok (Queue {status; plist; selected})
         | Music_db {status = _; db;} ->
@@ -158,7 +158,7 @@ module Internal_data = struct
           | Queue {status; plist; selected} ->
               let prev = status.timestamp in
               if ((now -. prev) > 1.0) then
-                MDA.fetch_queue_list client
+                Lwt.return (MDA.fetch_queue_list client)
                 >>= fun plist ->
                   MDA.fetch_status client
                   >>= function

@@ -84,6 +84,7 @@ let gen_title_bar internal_data (w,h) =
 
   (* artist title track album time *)
 let build_song_line song current selected term_width =
+  let open MpdDataAccess.Song in
   let norm_attr = A.(fg lightblack) in
   let curr_attr = A.(fg blue) in
   let sel_attr = A.(fg lightblue ++ bg black) in
@@ -92,11 +93,11 @@ let build_song_line song current selected term_width =
     | false, true -> curr_attr
     | false, false -> norm_attr
   in
-  let title = Mpd.Song.title song in
-  let artist = Mpd.Song.artist song in
-  let album = Mpd.Song.album song in
-  let time = Mpd.Song.duration song in
-  let track = Mpd.Song.track song in
+  let title = song.title in
+  let artist = song.artist in
+  let album = song.album in
+  let time = song.time in
+  let track = song.track in
   let perc p i =
     let i' = float_of_int i in
     int_of_float (i' *. p /. 100.)
@@ -106,7 +107,7 @@ let build_song_line song current selected term_width =
   let space_char = Uchar.of_char ' ' in
   let background_bar = I.(uchars attr (Array.make term_width space_char)) in
   let track_img = I.(string attr track) in
-  let duration_img = I.(string attr (duration_to_string time)) in
+  let duration_img = I.(string attr (string_of_int time)) in
   let sep = I.(string A.(fg lightgreen) " ⋅ ") (* 0x22C5 *) in
   let non_fixed_width =
     w - ( 4 * I.((width sep) + (width track_img) + (width duration_img))) in
@@ -130,9 +131,9 @@ open Mpd.Queue_lwt
 
 let gen_playlist_img selected plist current_song (w, h) =
   match plist with
-  | PlaylistError message ->
+  |  Error message ->
       Lwt.return I.(strf ~attr:A.(fg red) "Error: %s" message)
-  | Playlist songs ->
+  | Ok songs ->
       let lines = List.mapi (fun i song ->
         build_song_line song (current_song = i) (selected = i) (w - 2)
         ) songs in

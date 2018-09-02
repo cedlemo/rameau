@@ -40,7 +40,7 @@ let result_status_playlist_length = function
       match data with
       | Music_db _ | Help _ -> 0
       | Queue {status; plist; selected} -> match plist with
-                                           | Playlist p -> List.length p
+                                           | Ok p -> List.length p
                                            | _ -> 0
 
 let rec loop term (e, t) dim client idata =
