@@ -75,6 +75,19 @@ let rec loop term (e, t) dim client idata =
           >>= fun idata' ->
             render_and_loop term (new_events ()) idata' dim client
   in
+  let move_selection keep_in_bounds =
+    match idata with
+    | Error _ -> loop term (event term, t) dim client idata
+    | Ok data ->
+        Lwt.cancel t;
+        let selected = get_selected data in
+        let pl_len = get_n_elements data in
+        let sel = keep_in_bounds selected pl_len in
+        let d = set_selected (sel, 0, 0) data in (* TODO : deal with 3 selectors *)
+        Internal_data.update (Ok d) client
+        >>= fun idata' ->
+          render_and_loop term (new_events ()) idata' dim client
+  in
   (e <?> t) >>= function
   | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl])
   | `Key (`ASCII 'q', []) -> Mpd.Client_lwt.close client
@@ -93,32 +106,10 @@ let rec loop term (e, t) dim client idata =
       >>= fun idata' ->
         render_and_loop term (new_events ()) idata' dim client
   end
-  | `Key (`ASCII 'j', []) -> begin
-    match idata with
-    | Error _ -> loop term (event term, t) dim client idata
-    | Ok data ->
-        Lwt.cancel t;
-        let selected = get_selected data in
-        let pl_len = get_n_elements data in
-        let sel = if selected + 1 >= pl_len then 0 else selected + 1 in
-        let d = set_selected (sel, 0, 0) data in(* TODO : deal with 3 selectors *)
-        Internal_data.update (Ok d) client
-        >>= fun idata' ->
-          render_and_loop term (new_events ()) idata' dim client
-  end
-  | `Key (`ASCII 'k', []) -> begin
-    match idata with
-    | Error _ -> loop term (event term, t) dim client idata
-    | Ok data ->
-        Lwt.cancel t;
-        let selected = get_selected data in
-        let pl_len = get_n_elements data in
-        let sel = if selected - 1 < 0 then pl_len - 1 else selected - 1 in
-        let d = set_selected (sel, 0, 0) data in (* TODO : deal with 3 selectors *)
-        Internal_data.update (Ok d) client
-        >>= fun idata' ->
-          render_and_loop term (new_events ()) idata' dim client
-  end
+  | `Key (`ASCII 'j', []) ->
+    move_selection (fun s l -> if s + 1 >= l then 0 else s + 1)
+  | `Key (`ASCII 'k', []) ->
+    move_selection (fun s l -> if s - 1 < 0 then l - 1 else s - 1)
   | `Key (`Enter, [])     -> wrap_command Commands.rameau_play
   | `Key (`ASCII 's', []) -> wrap_command Commands.rameau_stop
   | `Key (`ASCII 'p', []) -> wrap_command Commands.rameau_toggle_pause
