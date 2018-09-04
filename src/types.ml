@@ -18,7 +18,7 @@
 
 open Mpd
 open Lwt.Infix
-module MDA = MpdDataAccess
+module MDA = Mpd_data_access
 
 module Internal_data = struct
   type view = Queue_view | Help_view | Music_db_view   (** Use to represent the type of interface to draw *)

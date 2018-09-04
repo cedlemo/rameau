@@ -84,7 +84,7 @@ let gen_title_bar internal_data (w,h) =
 
   (* artist title track album time *)
 let build_song_line song current selected term_width =
-  let open MpdDataAccess.Song in
+  let open Mpd_data_access.Song in
   let norm_attr = A.(fg lightblack) in
   let curr_attr = A.(fg blue) in
   let sel_attr = A.(fg lightblue ++ bg black) in
