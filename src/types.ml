@@ -63,50 +63,50 @@ module Internal_data = struct
   let get_n_elements = function
     | Help {status} -> -1
     | Music_db {status; db} ->
-        let n_artist = List.length db.artist.items in
-        let n_album = List.length db.album.items in
-        let n_song = List.length db.song.items in
-        max n_artist n_album
-        |> max n_song
+      let n_artist = List.length db.artist.items in
+      let n_album = List.length db.album.items in
+      let n_song = List.length db.song.items in
+      max n_artist n_album
+      |> max n_song
     | Queue {status; plist; selected} -> match plist with
-        | Error _ -> -1
-        | Ok p -> List.length p
+      | Error _ -> -1
+      | Ok p -> List.length p
 
   (** Set selected. *)
   let set_selected (i,i',i'') = function
     | Help {status} -> Help {status}
     | Queue {status; plist; selected} -> Queue {status; plist; selected = i}
     | Music_db {status; db} ->
-        let artist_pan = {db.artist with selected = i} in
-        let album_pan = {db.album with selected = i'} in
-        let song_pan = {db.song with selected = i''} in
-        Music_db {status;
-                  db = {artist = artist_pan;
-                        album = album_pan;
-                        song = song_pan} }
+      let artist_pan = {db.artist with selected = i} in
+      let album_pan = {db.album with selected = i'} in
+      let song_pan = {db.song with selected = i''} in
+      Music_db {status;
+                db = {artist = artist_pan;
+                      album = album_pan;
+                      song = song_pan} }
 
   let fetch_music_db client artist_sel album_sel song_sel =
     MDA.fetch_artists_in_music_db client
     >>= function
     | Error message -> Lwt.return_error message
     | Ok artists ->
-        let artists_pan = { items = artists; selected = artist_sel } in
-        let artist = List.nth artists artists_pan.selected in
-        MDA.fetch_albums_in_music_db client artist
+      let artists_pan = { items = artists; selected = artist_sel } in
+      let artist = List.nth artists artists_pan.selected in
+      MDA.fetch_albums_in_music_db client artist
+      >>= function
+      | Error message -> Lwt.return_error message
+      | Ok albums ->
+        let albums_pan = { items = albums; selected = album_sel } in
+        let album = List.nth albums albums_pan.selected in
+        MDA.fetch_songs_in_music_db client artist album
         >>= function
-          | Error message -> Lwt.return_error message
-          | Ok albums ->
-              let albums_pan = { items = albums; selected = album_sel } in
-              let album = List.nth albums albums_pan.selected in
-              MDA.fetch_songs_in_music_db client artist album
-              >>= function
-                | Error message -> Lwt.return_error message
-                | Ok  songs ->
-                    let songs_pan = { items = songs; selected = song_sel } in
-                    let music_db =  {artist = artists_pan;
-                                     album = albums_pan;
-                                     song = songs_pan} in
-                    Lwt.return_ok music_db
+        | Error message -> Lwt.return_error message
+        | Ok  songs ->
+          let songs_pan = { items = songs; selected = song_sel } in
+          let music_db =  {artist = artists_pan;
+                           album = albums_pan;
+                           song = songs_pan} in
+          Lwt.return_ok music_db
 
   (** Create / fill internal data. *)
   let create ?(view=Queue_view) client =
@@ -114,16 +114,16 @@ module Internal_data = struct
     >>= function
     | Error message -> Lwt.return_error message
     | Ok (timestamp, state, volume, song) ->
-        let status = {timestamp; state; volume; song} in
-        match view with
-          | Help_view -> Lwt.return_ok (Help { status })
-        | Queue_view -> Lwt.return (MDA.fetch_queue_list client)
-              >>= fun plist -> Lwt.return_ok (Queue { status; plist; selected = 0 })
-        | Music_db_view ->
-            fetch_music_db client 0 0 0
-            >>= function
-            | Error message -> Lwt.return_error message
-            | Ok  db -> Lwt.return_ok (Music_db { status; db })
+      let status = {timestamp; state; volume; song} in
+      match view with
+      | Help_view -> Lwt.return_ok (Help { status })
+      | Queue_view -> MDA.fetch_queue_list client
+        >>= fun plist -> Lwt.return_ok (Queue { status; plist; selected = 0 })
+      | Music_db_view ->
+        fetch_music_db client 0 0 0
+        >>= function
+        | Error message -> Lwt.return_error message
+        | Ok  db -> Lwt.return_ok (Music_db { status; db })
 
   (** Force to update an internal data. *)
   let force_update idata client =
@@ -131,18 +131,18 @@ module Internal_data = struct
     >>= function
     | Error message -> Lwt.return_error message
     | Ok (timestamp, state, volume, song) ->
-        let status = {timestamp; state; volume; song} in
-        match idata with
-        | Help _ -> Lwt.return_ok (Help {status})
-        | Queue {status = _; plist; selected} ->
-            Lwt.return (MDA.fetch_queue_list client)
-              >>= fun plist ->
-                Lwt.return_ok (Queue {status; plist; selected})
-        | Music_db {status = _; db;} ->
-            fetch_music_db client db.artist.selected db.album.selected db.song.selected
-            >>= function
-              | Error message -> Lwt.return_error message
-              | Ok db -> Lwt.return_ok (Music_db {status; db})
+      let status = {timestamp; state; volume; song} in
+      match idata with
+      | Help _ -> Lwt.return_ok (Help {status})
+      | Queue {status = _; plist; selected} ->
+        MDA.fetch_queue_list client
+        >>= fun plist ->
+        Lwt.return_ok (Queue {status; plist; selected})
+      | Music_db {status = _; db;} ->
+        fetch_music_db client db.artist.selected db.album.selected db.song.selected
+        >>= function
+        | Error message -> Lwt.return_error message
+        | Ok db -> Lwt.return_ok (Music_db {status; db})
 
   (** Update internal data but with checks for elapsed time in order to limit
    *  the number of request send to Mpd. (not every times a key is pressed. *)
@@ -151,36 +151,36 @@ module Internal_data = struct
     match idata with
     | Error message -> Lwt.return_error message
     | Ok internal_data ->
-        Mpd.Client_lwt.noidle client
-        >>= fun _ ->
-          match internal_data with
-          | Help {status} -> Lwt.return_ok internal_data
-          | Queue {status; plist; selected} ->
-              let prev = status.timestamp in
-              if ((now -. prev) > 1.0) then
-                Lwt.return (MDA.fetch_queue_list client)
-                >>= fun plist ->
-                  MDA.fetch_status client
-                  >>= function
-                    | Error message -> Lwt.return_error message
-                    | Ok (timestamp, state, volume, song) ->
-                      let status = {timestamp; state; volume; song} in
-                      Lwt.return_ok (Queue {status; plist; selected})
-              else Lwt.return_ok internal_data
-          | Music_db {status; db} ->
-              let prev = status.timestamp in
-              if ((now -. prev) > 1.0) then
-                MDA.fetch_status client
-                >>= function
-                  | Error message -> Lwt.return_error message
-                  | Ok (timestamp, state, volume, song) ->
-                      let s = {timestamp; state; volume; song} in
-                      begin if ((now -. prev) > 2.0) then
-                          fetch_music_db client db.artist.selected db.album.selected db.song.selected
-                        else Lwt.return_ok db
-                      end
-                      >>= function
-                        | Error message -> Lwt.return_error message
-                        | Ok db -> Lwt.return_ok (Music_db {status = s; db})
-              else Lwt.return_ok internal_data
+      Mpd.Client_lwt.noidle client
+      >>= fun _ ->
+      match internal_data with
+      | Help {status} -> Lwt.return_ok internal_data
+      | Queue {status; plist; selected} ->
+        let prev = status.timestamp in
+        if ((now -. prev) > 1.0) then
+          MDA.fetch_queue_list client
+          >>= fun plist ->
+          MDA.fetch_status client
+          >>= function
+          | Error message -> Lwt.return_error message
+          | Ok (timestamp, state, volume, song) ->
+            let status = {timestamp; state; volume; song} in
+            Lwt.return_ok (Queue {status; plist; selected})
+        else Lwt.return_ok internal_data
+      | Music_db {status; db} ->
+        let prev = status.timestamp in
+        if ((now -. prev) > 1.0) then
+          MDA.fetch_status client
+          >>= function
+          | Error message -> Lwt.return_error message
+          | Ok (timestamp, state, volume, song) ->
+            let s = {timestamp; state; volume; song} in
+            begin if ((now -. prev) > 2.0) then
+                fetch_music_db client db.artist.selected db.album.selected db.song.selected
+              else Lwt.return_ok db
+            end
+            >>= function
+            | Error message -> Lwt.return_error message
+            | Ok db -> Lwt.return_ok (Music_db {status = s; db})
+        else Lwt.return_ok internal_data
 end
