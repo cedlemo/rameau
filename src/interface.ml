@@ -95,6 +95,7 @@ let rec loop term (e, t) dim client idata =
   | `Key (`ASCII 'p', []) -> wrap_command Commands.rameau_toggle_pause
   | `Key (`ASCII '+', []) -> wrap_command Commands.rameau_inc_vol
   | `Key (`ASCII '-', []) -> wrap_command Commands.rameau_decr_vol
+  | `Key (`ASCII '0', []) -> switch_view Internal_data.Help_view
   | `Key (`ASCII '1', []) -> switch_view Internal_data.Queue_view
   | `Key (`ASCII '2', []) -> switch_view Internal_data.Music_db_view
   | _ -> render_and_loop term (event term, t) idata dim client

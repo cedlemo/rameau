@@ -170,12 +170,32 @@ let gen_pan_list {items; selected} (w, h) empty_message =
     |> Lwt.return
 
 let gen_help_view (w, h) =
-  let shortcut = I.(string A.(fg white) "shortcuts") in
-  grid [[I.(void 1 1); shortcut; I.(void 1 1); shortcut;];
-        [I.(void 1 1); shortcut; I.(void 1 1); shortcut;];
-        [I.(void 1 1); shortcut; I.(void 1 1); shortcut;];
-        [I.(void 1 1); shortcut; I.(void 1 1); shortcut;];
-        [I.(void 1 1); shortcut; I.(void 1 1); shortcut;];
+  let section_title title =
+    let empty_line = I.(void 1 1) in
+    let label_line =
+      I.hcat([I.(void 1 1); I.(string A.(fg lightgreen ++ st bold) title);]) in
+    [I.vcat([empty_line; label_line; empty_line])]
+
+  in
+  let label s = I.(string A.(fg white) s) in
+  let simple_quote = I.(string A.(fg lightgreen) "'") in
+  let shortcut_line keys description =
+    [I.(void 3 1); simple_quote; label keys; simple_quote; I.(void 1 1); label description;]
+  in
+  grid [
+    section_title "General key bindings";
+    shortcut_line "0" "Displays this help";
+    shortcut_line "1" "Displays the Queue view: the list of the songs in the playing queue.";
+    shortcut_line "2" "Displays the Music database view: the list of all the songs in the MPD database.";
+    shortcut_line "q" "Quit Rameau";
+    section_title "Queue view";
+    shortcut_line "j" "Move selection down";
+    shortcut_line "k" "Move selection up";
+    shortcut_line "p" "Toggle pause";
+    shortcut_line "p" "Toggle pause";
+    shortcut_line "s" "Stop playing";
+    shortcut_line "+" "Increase sound by one";
+    shortcut_line "-" "Decrease sound by one";
        ]
   |> Lwt.return
 
