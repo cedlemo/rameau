@@ -70,10 +70,18 @@ let fetch_status client =
         let song = Mpd.Status.song d in
         Lwt.return_ok (timestamp, state, volume, song)
 
-let fetch_queue_list client : (Song.t list, string) result =
-  (* Mpd.Queue_lwt.playlist client
-     build_random_stub "Playlist: song"
-*)
+let fetch_queue_list client : (Song.t list, string) result Lwt.t =
+   Mpd.Queue_lwt.playlist client
+   >>= function
+   | Mpd.Queue_lwt.PlaylistError message -> Lwt.return_error message
+   | Mpd.Queue_lwt.Playlist p ->
+     let songs = List.map (fun s : Song.t -> { title = Mpd.Song.title s;
+                                      artist = Mpd.Song.artist s;
+                                      album = Mpd.Song.album s;
+                                      time = int_of_float (Mpd.Song.duration s); (* TOFIX *)
+                                      track = Mpd.Song.track s; }) p in
+    Lwt.return_ok songs
+  (*   build_random_stub "Playlist: song"
    Ok [{
       title = "title1";
       artist = "artist1";
@@ -88,21 +96,22 @@ let fetch_queue_list client : (Song.t list, string) result =
       time = 180;
       track = "2";
     }]
+*)
 
 let fetch_artists_in_music_db client =
-  (* Mpd.Music_database_lwt.list client Mpd.Music_database_lwt.Artist [] *)
+  Mpd.Music_database_lwt.list client Mpd.Music_database_lwt.Artist []
 (* Queries to implement
  * list album artist "artist name"
  * list title album "album name" artist "artist name"
- * *)
   build_random_stub "Artist"
+ * *)
 
 let fetch_albums_in_music_db client artist =
-  (* Mpd.Music_database_lwt.(list client Album [(Artist, artist)]) *)
-  build_random_stub "Album"
+  Mpd.Music_database_lwt.(list client Album [(Artist, artist)])
+  (* build_random_stub "Album" *)
 
 
 let fetch_songs_in_music_db client artist album =
-  (* Mpd.Music_database_lwt.(list client Title [(Artist, artist); (Album, album)]) *)
+  Mpd.Music_database_lwt.(list client Title [(Artist, artist); (Album, album)])
   (* This is some stubs *)
-  build_random_stub "Song"
+  (* build_random_stub "Song" *)
