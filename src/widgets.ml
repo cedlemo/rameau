@@ -19,7 +19,7 @@
 open Lwt.Infix
 open Notty
 open Notty_lwt
-open Types.Internal_data
+open Internal_data
 
 (**
  * view layouts :

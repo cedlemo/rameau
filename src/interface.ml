@@ -1,8 +1,7 @@
 open Lwt.Infix
 open Notty
 open Notty_lwt
-open Types
-open Types.Internal_data
+open Internal_data
 
 module Terminal = Notty_lwt.Term
 open Widgets

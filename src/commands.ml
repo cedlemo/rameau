@@ -16,7 +16,7 @@
  * along with Rameau.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
-open Types.Internal_data
+open Internal_data
 open Lwt.Infix
 
 let rameau_play client idata =
