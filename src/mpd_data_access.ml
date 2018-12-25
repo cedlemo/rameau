@@ -18,30 +18,36 @@ module Song = struct
       time = Mpd.Song.time s;
       track = Mpd.Song.track s;
     }
-    (*
-     let title = Mpd.Song.title song in
-  let artist = Mpd.Song.artist song in
-  let album = Mpd.Song.album song in
-  let time = Mpd.Song.duration song in
-  let track = Mpd.Song.track song in
- *)
 end
 
-(* Initialize random number generator *)
-let () = Random.self_init ()
+(** Module with functions permit to get mpd data when client is given as parameter
+ *  or stubs when no client is present *)
+module Mpd_or_stubs : sig
+  val fetch_status:
+    ?client:(Mpd.Client_lwt.t) -> unit ->  (float * Mpd.Status.state * int * int, string) result Lwt.t
+  val fetch_queue_list:
+    ?client:(Mpd.Client_lwt.t) -> unit -> (Song.t list, string) result Lwt.t
+  val fetch_artists_in_music_db:
+    ?client:(Mpd.Client_lwt.t) -> unit -> (string list, string) result Lwt.t
+  val fetch_albums_in_music_db:
+    ?client:(Mpd.Client_lwt.t) -> string -> (string list, string) result Lwt.t
+  val fetch_songs_in_music_db:
+    ?client:(Mpd.Client_lwt.t) -> string -> string -> (string list, string) result Lwt.t
+end = struct
 
-let build_random_stub prefix =
-  let n = Random.int 15 in
-  let rec build_stub i acc =
-    if i > n then acc
-    else
-      let s = String.concat " " [prefix; string_of_int i] in
-      build_stub (i + 1) (s :: acc)
-  in
-  if false then Lwt.return_error "nope" (* trick for the stub to return a Result Lwt.t. *)
-  else Lwt.return_ok (build_stub 0 [])
+  let build_random_stub prefix =
+    let () = Random.self_init () in
+    let n = Random.int 15 in
+    let rec build_stub i acc =
+      if i > n then acc
+      else
+        let s = String.concat " " [prefix; string_of_int i] in
+        build_stub (i + 1) (s :: acc)
+    in
+    if false then Lwt.return_error "nope" (* trick for the stub to return a Result Lwt.t. *)
+    else Lwt.return_ok (build_stub 0 [])
 
-let build_random_song title_n artist_n album_n time_n track : Song.t=
+  let _build_random_song title_n artist_n album_n time_n track : Song.t=
     {
       title = "title" ^ (string_of_int title_n);
       artist = "artist" ^ (string_of_int artist_n);
@@ -50,68 +56,55 @@ let build_random_song title_n artist_n album_n time_n track : Song.t=
       track = track;
     }
 
-(*
-  TODO
-  let build_random_song_list () =
-  let artist_n = Random.int 5 in
-  let title_n = Random.int 10 in
-  let album_n = Random.int 3 in
-  let time_n () = (Random.float 50.0) /. 100. in
-  let rec build i *)
-(** Used to get the internal status *)
-let fetch_status client =
-  Mpd.Client_lwt.status client
-  >>= function
-    | Error message -> Lwt.return_error message
-    | Ok d ->
-        let timestamp = Unix.time () in
-        let state = Mpd.Status.state d in
-        let volume = Mpd.Status.volume d in
-        let song = Mpd.Status.song d in
-        Lwt.return_ok (timestamp, state, volume, song)
+  let fetch_queue_list ?client () =
+    match client with
+    | Some client -> begin
+        Mpd.Queue_lwt.playlist client
+        >>= function
+        | Mpd.Queue_lwt.PlaylistError message -> Lwt.return_error message
+        | Mpd.Queue_lwt.Playlist p ->
+          let songs =
+            List.map (fun s : Song.t -> { title = Mpd.Song.title s;
+                                          artist = Mpd.Song.artist s;
+                                          album = Mpd.Song.album s;
+                                          time = int_of_float (Mpd.Song.duration s); (* TOFIX *)
+                                          track = Mpd.Song.track s; }) p
+          in
+          Lwt.return_ok songs
+      end
+    | None -> Lwt.return_ok [({ title = "title1"; artist = "artist1";
+                                album = "album1"; time = 120; track = "1"; } : Song.t);
+                             { title = "title2"; artist = "artist2";
+                               album = "album2"; time = 180; track = "2"; }]
 
-let fetch_queue_list client : (Song.t list, string) result Lwt.t =
-   Mpd.Queue_lwt.playlist client
-   >>= function
-   | Mpd.Queue_lwt.PlaylistError message -> Lwt.return_error message
-   | Mpd.Queue_lwt.Playlist p ->
-     let songs = List.map (fun s : Song.t -> { title = Mpd.Song.title s;
-                                      artist = Mpd.Song.artist s;
-                                      album = Mpd.Song.album s;
-                                      time = int_of_float (Mpd.Song.duration s); (* TOFIX *)
-                                      track = Mpd.Song.track s; }) p in
-    Lwt.return_ok songs
-  (*   build_random_stub "Playlist: song"
-   Ok [{
-      title = "title1";
-      artist = "artist1";
-      album = "album1";
-      time = 120;
-      track = "1";
-    };
-    {
-      title = "title2";
-      artist = "artist2";
-      album = "album2";
-      time = 180;
-      track = "2";
-    }]
-*)
+  let fetch_artists_in_music_db ?client () =
+    match client with
+    | Some client  -> Mpd.Music_database_lwt.list client Mpd.Music_database_lwt.Artist []
+    | None -> build_random_stub "Artist"
 
-let fetch_artists_in_music_db client =
-  Mpd.Music_database_lwt.list client Mpd.Music_database_lwt.Artist []
-(* Queries to implement
- * list album artist "artist name"
- * list title album "album name" artist "artist name"
-  build_random_stub "Artist"
- * *)
+  let fetch_albums_in_music_db ?client artist =
+    match client with
+    | Some client -> Mpd.Music_database_lwt.(list client Album [(Artist, artist)])
+    | None -> build_random_stub "Album"
 
-let fetch_albums_in_music_db client artist =
-  Mpd.Music_database_lwt.(list client Album [(Artist, artist)])
-  (* build_random_stub "Album" *)
+  let fetch_songs_in_music_db ?client artist album =
+    match client with
+    | Some client ->
+      Mpd.Music_database_lwt.(list client Title [(Artist, artist); (Album, album)])
+    | None -> build_random_stub "Song"
 
-
-let fetch_songs_in_music_db client artist album =
-  Mpd.Music_database_lwt.(list client Title [(Artist, artist); (Album, album)])
-  (* This is some stubs *)
-  (* build_random_stub "Song" *)
+  let fetch_status ?client () =
+    match client with
+    | Some client -> begin
+        Mpd.Client_lwt.status client
+        >>= function
+        | Error message -> Lwt.return_error message
+        | Ok d ->
+          let timestamp = Unix.time () in
+          let state = Mpd.Status.state d in
+          let volume = Mpd.Status.volume d in
+          let song = Mpd.Status.song d in
+          Lwt.return_ok (timestamp, state, volume, song)
+      end
+    | None  -> Lwt.return_ok (3.0, Mpd.Status.Play, 97, 2)
+end
