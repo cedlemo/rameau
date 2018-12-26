@@ -16,4 +16,4 @@
  * along with Rameau.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
-val interface: Mpd.Client_lwt.t -> unit Lwt.t
+val create: Mpd.Client_lwt.t -> unit Lwt.t

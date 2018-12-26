@@ -17,7 +17,6 @@
  *)
 
 open Lwt.Infix
-open Interface
 
 let run host port =
   let open Mpd in
@@ -28,7 +27,7 @@ let run host port =
       >>= fun connection ->
         Mpd.Client_lwt.initialize connection
         >>= fun client ->
-          interface client
+          Interface.create client
   in
   Lwt_main.run (
     Lwt.catch

@@ -1,9 +1,9 @@
 open Lwt.Infix
 open Notty
 open Notty_lwt
-open Internal_data
-
 module Terminal = Notty_lwt.Term
+
+open Internal_data
 open Widgets
 
 let listen_mpd_event client =
@@ -99,7 +99,7 @@ let rec loop term (e, t) dim client idata =
   | `Key (`ASCII 'q', []) -> Commands.rameau_quit client
   | _ -> render_and_loop term (event term, t) idata dim client
 
-let interface client =
+let create client =
   let term = Terminal.create () in
   let size = Terminal.size term in
   Internal_data.create client
