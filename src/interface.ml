@@ -68,8 +68,6 @@ let rec loop term (e, t) dim client idata =
           render_and_loop term (new_events ()) idata' dim client
   in
   (e <?> t) >>= function
-  | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl])
-  | `Key (`ASCII 'q', []) -> Mpd.Client_lwt.close client
   | `Mpd_event event_name -> begin
     begin match idata with
           | Error _ -> Internal_data.create client
@@ -97,6 +95,8 @@ let rec loop term (e, t) dim client idata =
   | `Key (`ASCII '0', []) -> switch_view Internal_data.Help_view
   | `Key (`ASCII '1', []) -> switch_view Internal_data.Queue_view
   | `Key (`ASCII '2', []) -> switch_view Internal_data.Music_db_view
+  | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl])
+  | `Key (`ASCII 'q', []) -> Commands.rameau_quit client
   | _ -> render_and_loop term (event term, t) idata dim client
 
 let interface client =
