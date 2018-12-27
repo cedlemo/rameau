@@ -16,6 +16,8 @@
  * along with Rameau.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
+open Notty
+open Notty_lwt
 module MDA = Mpd_data_access
 
 type view = Queue_view | Help_view | Music_db_view
@@ -31,10 +33,20 @@ type status =
 type panel = { items: string list; selected: int}
 type music_db_selector = { artist: panel; album: panel; song: panel }
 
+type shortcuts = [ `Key of Unescape.key
+                 | `Mouse of Unescape.mouse
+                 | `Paste of Unescape.paste
+                 | `Resize of int * int ] Lwt_stream.t -> unit
 type t =
-  | Queue of {status: status; plist: (MDA.Song.t list, string) result; selected: int }
-  | Music_db of {status: status; db: music_db_selector }
-  | Help of {status: status}
+  | Queue of { status: status;
+               plist: (MDA.Song.t list, string) result;
+               selected: int;
+               shortcuts: shortcuts }
+  | Music_db of { status: status;
+                  db: music_db_selector ;
+                  shortcuts: shortcuts }
+  | Help of { status: status;
+              shortcuts: shortcuts }
 
 val get_status: t -> status
 (** Get the status data from the internal data. *)
