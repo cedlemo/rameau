@@ -33,10 +33,6 @@ type status =
 type panel = { items: string list; selected: int}
 type music_db_selector = { artist: panel; album: panel; song: panel }
 
-type shortcuts = [ `Key of Unescape.key
-                 | `Mouse of Unescape.mouse
-                 | `Paste of Unescape.paste
-                 | `Resize of int * int ] Lwt_stream.t -> unit
 type t =
   | Queue of { status: status;
                plist: (MDA.Song.t list, string) result;
@@ -47,9 +43,18 @@ type t =
                   shortcuts: shortcuts }
   | Help of { status: status;
               shortcuts: shortcuts }
+and
+shortcuts = [ `End
+            | `Key of Notty.Unescape.key
+            | `Mouse of Notty.Unescape.mouse
+            | `Mpd_event of (string, string) result
+            | `Paste of Notty.Unescape.paste
+            | `Resize of int * int ] -> Mpd.Client_lw.t -> 'a -> t -> bool Lwt.t
 
 val get_status: t -> status
 (** Get the status data from the internal data. *)
+val get_shortcuts: t -> shortcuts
+(** Get the shortcuts handler from the internal data *)
 val get_selected: t -> int
 (** Get the index of the current selected item *)
 val get_n_elements: t -> int

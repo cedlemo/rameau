@@ -87,8 +87,8 @@ let rec loop term (e, t) dim client idata =
     move_selection (fun s l -> if s + 1 >= l then 0 else s + 1)
   | `Key (`ASCII 'k', []) ->
     move_selection (fun s l -> if s - 1 < 0 then l - 1 else s - 1)
-  | `Key (`Enter, [])     -> wrap_command Commands.rameau_play
-  | `Key (`ASCII 's', []) -> wrap_command Commands.rameau_stop
+(*  | `Key (`Enter, [])     -> wrap_command Commands.rameau_play
+  | `Key (`ASCII 's', []) -> wrap_command Commands.rameau_stop *)
   | `Key (`ASCII 'p', []) -> wrap_command Commands.rameau_toggle_pause
   | `Key (`ASCII '+', []) -> wrap_command Commands.rameau_inc_vol
   | `Key (`ASCII '-', []) -> wrap_command Commands.rameau_decr_vol
@@ -97,7 +97,14 @@ let rec loop term (e, t) dim client idata =
   | `Key (`ASCII '2', []) -> switch_view Internal_data.Music_db_view
   | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl])
   | `Key (`ASCII 'q', []) -> Commands.rameau_quit client
-  | _ -> render_and_loop term (event term, t) idata dim client
+  | other_keys -> match idata with
+    | Error _ -> loop term (event term, t) dim client idata
+    | Ok idata' ->
+    let shortcuts = get_shortcuts idata' in
+    shortcuts other_keys  client t idata'
+    >>= function
+    | true ->  loop term (new_events ()) dim client idata
+    | false -> render_and_loop term (event term, t) idata dim client
 
 let create client =
   let term = Terminal.create () in

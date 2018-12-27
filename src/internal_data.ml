@@ -34,10 +34,6 @@ type status =
 
 type panel = { items: string list; selected: int}
 type music_db_selector = { artist: panel; album: panel; song: panel }
-type shortcuts = [ `Key of Unescape.key
-                 | `Mouse of Unescape.mouse
-                 | `Paste of Unescape.paste
-                 | `Resize of int * int ] Lwt_stream.t -> unit
 type t =
   | Queue of { status: status;
                plist: (MDA.Song.t list, string) result;
@@ -48,6 +44,13 @@ type t =
                   shortcuts: shortcuts }
   | Help of { status: status;
               shortcuts: shortcuts }
+and
+shortcuts = [ `End
+            | `Key of Notty.Unescape.key
+            | `Mouse of Notty.Unescape.mouse
+            | `Mpd_event of (string, string) result
+            | `Paste of Notty.Unescape.paste
+            | `Resize of int * int ] -> Mpd.Client_lw.t -> 'a -> t -> Lwt.t bool
 
 let view_name = function
   | Queue _ -> "Queue"
@@ -124,12 +127,26 @@ let create ?(view=Queue_view) client =
   | Error message -> Lwt.return_error message
   | Ok (timestamp, state, volume, song) ->
     let status = {timestamp; state; volume; song} in
-    let shortcuts = function
-      | _-> ()
+    let shortcuts events client t idata =
+      match events with
+      | _-> Lwt.return false
     in
     match view with
     | Help_view -> Lwt.return_ok (Help { status; shortcuts })
-    | Queue_view -> MOS.fetch_queue_list ~client ()
+    | Queue_view ->
+      let shortcuts events client t idata =
+        match events with
+        | `Key (`Enter, [])     ->
+          Lwt.cancel t;
+          Commands.rameau_play client idata
+          >>= fun _ -> Lwt.return true
+        | `Key (`ASCII 's', []) ->
+          Lwt.cancel t;
+          Commands.rameau_stop client idata
+          >>= fun _ -> Lwt.return true
+        | _ -> Lwt.return false
+      in
+      MOS.fetch_queue_list ~client ()
       >>= fun plist -> Lwt.return_ok (Queue { status;
                                               plist;
                                               selected = 0;
