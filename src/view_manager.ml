@@ -53,43 +53,22 @@ let create ?(view=Queue_view) client =
   | Error message -> Lwt.return_error message
   | Ok (timestamp, state, volume, song) ->
     let status = {timestamp; state; volume; song} in
-    let shortcuts events client t idata =
-      match events with
-      | _-> Lwt.return false
-    in
     match view with
-    | Help_view -> Lwt.return_ok (Help { status; shortcuts })
+    | Help_view -> Lwt.return_ok (Help { status; shortcuts = Shortcuts.none})
     | Queue_view ->
-      let shortcuts events client t idata =
-        match events with
-        | `Key (`Enter, [])     ->
-          Lwt.cancel t; Commands.rameau_play client idata
-          >>= fun _ -> Lwt.return true
-        | `Key (`ASCII 's', []) ->
-          Lwt.cancel t; Commands.rameau_stop client idata
-          >>= fun _ -> Lwt.return true
-        | `Key (`ASCII 'p', []) ->
-          Lwt.cancel t; Commands.rameau_toggle_pause client idata
-          >>= fun _ -> Lwt.return true
-        | `Key (`ASCII '+', []) ->
-          Lwt.cancel t; Commands.rameau_inc_vol client idata
-          >>= fun _ -> Lwt.return true
-        | `Key (`ASCII '-', []) ->
-          Lwt.cancel t; Commands.rameau_decr_vol client idata
-          >>= fun _ -> Lwt.return true
-        | _ -> Lwt.return false
-      in
       MOS.fetch_queue_list ~client ()
       >>= fun plist -> Lwt.return_ok (Queue { status;
                                               plist;
                                               selected = 0;
-                                              shortcuts
+                                              shortcuts = Shortcuts.queue
                                             })
     | Music_db_view ->
       fetch_music_db client 0 0 0
       >>= function
       | Error message -> Lwt.return_error message
-      | Ok  db -> Lwt.return_ok (Music_db { status; db; shortcuts })
+      | Ok  db -> Lwt.return_ok (Music_db { status;
+                                            db;
+                                            shortcuts = Shortcuts.none })
 
 let force_update idata client =
   MOS.fetch_status ~client ()
