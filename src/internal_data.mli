@@ -49,7 +49,13 @@ shortcuts = [ `End
             | `Mouse of Notty.Unescape.mouse
             | `Mpd_event of (string, string) result
             | `Paste of Notty.Unescape.paste
-            | `Resize of int * int ] -> Mpd.Client_lw.t -> 'a -> t -> bool Lwt.t
+            | `Resize of int * int ] -> Mpd.Client_lwt.t ->
+            [ `End
+            | `Key of Notty.Unescape.key
+            | `Mouse of Notty.Unescape.mouse
+            | `Mpd_event of (string, string) result
+            | `Paste of Notty.Unescape.paste
+            | `Resize of int * int ] Lwt.t -> t -> bool Lwt.t
 
 val get_status: t -> status
 (** Get the status data from the internal data. *)
