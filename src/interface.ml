@@ -3,7 +3,7 @@ open Notty
 open Notty_lwt
 module Terminal = Notty_lwt.Term
 
-open Internal_data
+open View
 open Widgets
 
 let listen_mpd_event client =
@@ -50,7 +50,7 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
         Lwt.cancel ev_mpd;
         Mpd.Client_lwt.noidle client
         >>= fun _ ->
-          Internal_data.create ~view client
+          View_manager.create ~view client
           >>= fun idata' ->
             render_and_loop term (new_events ()) idata' dim client
   in
@@ -63,15 +63,15 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
         let pl_len = get_n_elements data in
         let sel = keep_in_bounds selected pl_len in
         let d = set_selected (sel, 0, 0) data in (* TODO : deal with 3 selectors *)
-        Internal_data.update (Ok d) client
+        View_manager.update (Ok d) client
         >>= fun idata' ->
           render_and_loop term (new_events ()) idata' dim client
   in
   (ev_term <?> ev_mpd) >>= function
   | `Mpd_event event_name -> begin
     begin match idata with
-          | Error _ -> Internal_data.create client
-          | Ok d -> Internal_data.force_update d client
+          | Error _ -> View_manager.create client
+          | Ok d -> View_manager.force_update d client
     end
     >>= fun idata' ->
       let events = (ev_term, listen_mpd_event client) in
@@ -79,7 +79,7 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
   end
   | `Resize dim -> begin
     Lwt.cancel ev_mpd;
-    Internal_data.update idata client
+    View_manager.update idata client
       >>= fun idata' ->
         render_and_loop term (new_events ()) idata' dim client
   end
@@ -92,9 +92,9 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
   | `Key (`ASCII 'p', []) -> wrap_command Commands.rameau_toggle_pause
   | `Key (`ASCII '+', []) -> wrap_command Commands.rameau_inc_vol
   | `Key (`ASCII '-', []) -> wrap_command Commands.rameau_decr_vol *)
-  | `Key (`ASCII '0', []) -> switch_view Internal_data.Help_view
-  | `Key (`ASCII '1', []) -> switch_view Internal_data.Queue_view
-  | `Key (`ASCII '2', []) -> switch_view Internal_data.Music_db_view
+  | `Key (`ASCII '0', []) -> switch_view View.Help_view
+  | `Key (`ASCII '1', []) -> switch_view View.Queue_view
+  | `Key (`ASCII '2', []) -> switch_view View.Music_db_view
   | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl])
   | `Key (`ASCII 'q', []) -> Commands.rameau_quit client
   | other_keys -> match idata with
@@ -109,7 +109,7 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
 let create client =
   let term = Terminal.create () in
   let size = Terminal.size term in
-  Internal_data.create client
+  View_manager.create client
   >>= fun internal_data ->
     render internal_data size
     >>= fun img ->
