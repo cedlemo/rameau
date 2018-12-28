@@ -77,11 +77,6 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
     move_selection (fun s l -> if s + 1 >= l then 0 else s + 1)
   | `Key (`ASCII 'k', []) ->
     move_selection (fun s l -> if s - 1 < 0 then l - 1 else s - 1)
-  | `Key (`ASCII '0', []) -> switch_view View.Help_view
-  | `Key (`ASCII '1', []) -> switch_view View.Queue_view
-  | `Key (`ASCII '2', []) -> switch_view View.Music_db_view
-  | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl])
-  | `Key (`ASCII 'q', []) -> Commands.rameau_quit client
   | other_keys -> match idata with
     | Error _ -> loop term (event term, ev_mpd) dim client idata
     | Ok idata' ->
@@ -89,7 +84,14 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
     shortcuts other_keys  client ev_mpd idata'
     >>= function
     | true ->  loop term (new_events ()) dim client idata
-    | false -> render_and_loop term (event term, ev_mpd) idata dim client
+    | false ->
+      Shortcuts.global client other_keys ev_mpd idata
+      >>= function
+      | Shortcuts.True -> loop term (new_events ()) dim client idata
+      | Shortcuts.WithUpdate idata' ->
+        render_and_loop term (new_events ()) idata' dim client
+      | Shortcuts.False ->
+      render_and_loop term (event term, ev_mpd) idata dim client
 
 let create client =
   let term = Terminal.create () in

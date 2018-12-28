@@ -66,3 +66,9 @@ let rameau_decr_vol client idata =
 
 let rameau_quit client =
   Mpd.Client_lwt.close client
+
+let switch_view view client t idata =
+  Lwt.cancel t;
+  Mpd.Client_lwt.noidle client
+  >>= fun _ ->
+  View_manager.create ~view client
