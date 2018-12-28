@@ -33,16 +33,6 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
   let new_events () =
     (event term, listen_mpd_event client)
   in
-  let wrap_command command =
-    match idata with
-    | Error _ -> loop term (event term, ev_mpd) dim client idata
-    | Ok d -> (
-      Lwt.cancel ev_mpd;
-      command client d
-      >>= fun () ->
-        loop term (new_events ()) dim client idata
-    )
-  in
   let switch_view view =
     match idata with
     | Error _ -> loop term (event term, ev_mpd) dim client idata
@@ -87,11 +77,6 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
     move_selection (fun s l -> if s + 1 >= l then 0 else s + 1)
   | `Key (`ASCII 'k', []) ->
     move_selection (fun s l -> if s - 1 < 0 then l - 1 else s - 1)
-(*  | `Key (`Enter, [])     -> wrap_command Commands.rameau_play
-  | `Key (`ASCII 's', []) -> wrap_command Commands.rameau_stop
-  | `Key (`ASCII 'p', []) -> wrap_command Commands.rameau_toggle_pause
-  | `Key (`ASCII '+', []) -> wrap_command Commands.rameau_inc_vol
-  | `Key (`ASCII '-', []) -> wrap_command Commands.rameau_decr_vol *)
   | `Key (`ASCII '0', []) -> switch_view View.Help_view
   | `Key (`ASCII '1', []) -> switch_view View.Queue_view
   | `Key (`ASCII '2', []) -> switch_view View.Music_db_view
