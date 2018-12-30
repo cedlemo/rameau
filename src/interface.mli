@@ -16,4 +16,5 @@
  * along with Rameau.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
+(** Generate the main interface of rameau *)
 val create: Mpd.Client_lwt.t -> unit Lwt.t

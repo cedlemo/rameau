@@ -16,6 +16,7 @@
  * along with Rameau.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
+(** Module that manage the creation, update of Views. *)
 val create:
   ?view:View.desc -> Mpd.Client_lwt.t -> (View.t, string) Result.result Lwt.t
 (** Create / fill internal data. *)

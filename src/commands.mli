@@ -16,6 +16,7 @@
  * along with Rameau.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
+(* Module that regroups the functions related to rameau functionalities.*)
 val rameau_play: Mpd.Client_lwt.t -> View.t -> unit Lwt.t
 
 val rameau_stop: Mpd.Client_lwt.t -> View.t -> unit Lwt.t
@@ -27,14 +28,3 @@ val rameau_inc_vol: Mpd.Client_lwt.t -> View.t -> unit Lwt.t
 val rameau_decr_vol: Mpd.Client_lwt.t -> View.t -> unit Lwt.t
 
 val rameau_quit: Mpd.Client_lwt.t -> unit Lwt.t
-
-val rameau_switch_view:
-  View.desc ->
-  Mpd.Client_lwt.t ->
-  [ `End
-  | `Key of Notty.Unescape.key
-  | `Mouse of Notty.Unescape.mouse
-  | `Mpd_event of (string, string) result
-  | `Paste of Notty.Unescape.paste
-  | `Resize of int * int ] Lwt.t
-    -> View.t -> (View.t, string) result Lwt.t

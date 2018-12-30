@@ -74,7 +74,7 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
     >>= function
     | true ->  loop term (new_events ()) dim client idata
     | false ->
-      Shortcuts.global other_keys client ev_mpd idata'
+      Global_shortcuts.global other_keys client ev_mpd idata'
       >>= function
       | Shortcuts.True -> loop term (new_events ()) dim client idata
       | Shortcuts.WithUpdate idata' ->
