@@ -22,7 +22,10 @@ let rameau_switch_view view client t idata =
 
 let global events client t idata =
   let switch view =
-    rameau_switch_view View.Help_view client t idata
+    Lwt.cancel t;
+    Mpd.Client_lwt.noidle client
+    >>= fun _ ->
+    View_manager.create ~view client
     >>= function
     | Error _ -> Lwt.return False
     | Ok idata' -> Lwt.return (WithUpdate idata')
