@@ -33,8 +33,8 @@ let queue events client t idata =
 
 let global events client t idata =
   let switch view =
-    Commands.switch_view View.Help_view client t idata
-    >>function
+    Commands.rameau_switch_view View.Help_view client t idata
+    >>= function
     | Error _ -> Lwt.return False
     | Ok idata' -> Lwt.return (WithUpdate idata')
   in
@@ -42,6 +42,10 @@ let global events client t idata =
   | `Key (`ASCII '0', []) -> switch View.Help_view
   | `Key (`ASCII '1', []) -> switch View.Queue_view
   | `Key (`ASCII '2', []) -> switch View.Music_db_view
-  | `End | `Key (`Escape, []) | `Key (`ASCII 'C', [`Ctrl])
-  | `Key (`ASCII 'q', []) -> Commands.rameau_quit client
+  | `End
+  | `Key (`Escape, [])
+  | `Key (`ASCII 'C', [`Ctrl])
+  | `Key (`ASCII 'q', []) ->
+    Commands.rameau_quit client
+    >>= fun () -> Lwt.return True
   | _ -> Lwt.return False
