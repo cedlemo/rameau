@@ -33,19 +33,6 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
   let new_events () =
     (event term, listen_mpd_event client)
   in
-  let move_selection keep_in_bounds =
-    match idata with
-    | Error _ -> loop term (event term, ev_mpd) dim client idata
-    | Ok data ->
-        Lwt.cancel ev_mpd;
-        let selected = get_selected data in
-        let pl_len = get_n_elements data in
-        let sel = keep_in_bounds selected pl_len in
-        let d = set_selected (sel, 0, 0) data in (* TODO : deal with 3 selectors *)
-        View_manager.update (Ok d) client
-        >>= fun idata' ->
-          render_and_loop term (new_events ()) idata' dim client
-  in
   (ev_term <?> ev_mpd) >>= function
   | `Mpd_event event_name -> begin
     begin match idata with
@@ -62,17 +49,15 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
       >>= fun idata' ->
         render_and_loop term (new_events ()) idata' dim client
   end
-  | `Key (`ASCII 'j', []) ->
-    move_selection (fun s l -> if s + 1 >= l then 0 else s + 1)
-  | `Key (`ASCII 'k', []) ->
-    move_selection (fun s l -> if s - 1 < 0 then l - 1 else s - 1)
   | other_keys -> match idata with
     | Error _ -> loop term (event term, ev_mpd) dim client idata
     | Ok idata' ->
     let shortcuts = get_shortcuts idata' in
     shortcuts other_keys  client ev_mpd idata'
     >>= function
-    | View.WithUpdate _ | View.True ->  loop term (new_events ()) dim client idata
+    | View.WithUpdate idata' ->
+      render_and_loop term (new_events ()) (Ok idata') dim client
+    | View.True ->  loop term (new_events ()) dim client idata
     | View.False ->
       Shortcuts.global other_keys client ev_mpd idata'
       >>= function
