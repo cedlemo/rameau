@@ -1,6 +1,23 @@
+(*
+ * Copyright 2018 Cedric LE MOIGNE, cedlemo@gmx.com
+ * This file is part of Rameau.
+ *
+ * Rameau is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * any later version.
+ *
+ * Rameau is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Rameau.  If not, see <http://www.gnu.org/licenses/>.
+ *)
+
 open Lwt.Infix
 open View
-
 
 let none events client t idata =
   match events with
@@ -12,12 +29,12 @@ let queue events client ev_mpd idata =
     let selected = get_selected idata in
     let pl_len = get_n_elements idata in
     let sel = keep_in_bounds selected pl_len in
-    let d = set_selected (sel, 0, 0) idata in (* TODO : deal with 3 selectors *)
+    let d = set_selected (sel, 0, 0) idata in
     View_manager.update (Ok d) client
     >>= function
-      | Error _ -> Lwt.return False
-      | Ok idata' -> Lwt.return (View.WithUpdate idata')
-in
+    | Error _ -> Lwt.return False
+    | Ok idata' -> Lwt.return (View.WithUpdate idata')
+  in
   match events with
   | `Key (`Enter, [])     ->
     Lwt.cancel ev_mpd; Commands.rameau_play client idata

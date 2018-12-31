@@ -16,7 +16,13 @@
  * along with Rameau.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
-(** The interface of rameau *)
+(** Module that regroups all the key event handlers, the functions associated
+    with the views in order to bind actions with keys. *)
 
-val create: Mpd.Client_lwt.t -> unit Lwt.t
-(** Generate the main interface of rameau *)
+val none: View.shortcuts
+(** key events handler that does nothing *)
+val queue: View.shortcuts
+(** key events handler associated to the Queue view *)
+val global: View.shortcuts
+(** key events handler associated with the global interface.
+    Those bindings are available il all views*)

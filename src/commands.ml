@@ -66,5 +66,3 @@ let rameau_decr_vol client idata =
 
 let rameau_quit client =
   Mpd.Client_lwt.close client
-
-
