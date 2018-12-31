@@ -37,12 +37,18 @@ type t =
   | Queue of { status: status;
                plist: (MDA.Song.t list, string) result;
                selected: int;
-               shortcuts: shortcuts }
+               shortcuts: shortcuts;
+               render: render
+             }
   | Music_db of { status: status;
                   db: music_db_selector ;
-                  shortcuts: shortcuts }
+                  shortcuts: shortcuts ;
+                  render: render;
+                }
   | Help of { status: status;
-              shortcuts: shortcuts }
+              shortcuts: shortcuts;
+              render: render;
+            }
 and
 shortcuts = [ `End
             | `Key of Notty.Unescape.key
@@ -62,11 +68,17 @@ and event_handled = False | True | WithUpdate of t
  * True if the function responded to the event
  * WithUpdate if the function responded to the event and updated the internal
  * data *)
+and render = t -> int * int -> Notty.image Lwt.t
+(* type for the function that generate the notty image of a view. *)
 
 val get_status: t -> status
 (** Get the status data from the internal data. *)
 val get_shortcuts: t -> shortcuts
 (** Get the shortcuts handler from the internal data *)
+val get_render: t -> render
+(** Get the render function associated with the current internal data *)
+val render: t -> int * int -> Notty.image Lwt.t
+(** Directly call the render function in order to generate the Notty image.*)
 val get_selected: t -> int
 (** Get the index of the current selected item *)
 val get_n_elements: t -> int

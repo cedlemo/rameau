@@ -47,20 +47,21 @@ let fetch_music_db client artist_sel album_sel song_sel =
                          song = songs_pan} in
         Lwt.return_ok music_db
 
-let create ?(view=Queue_view) client shortcuts =
+let create ?(view=Queue_view) client shortcuts render =
   MOS.fetch_status ~client ()
   >>= function
   | Error message -> Lwt.return_error message
   | Ok (timestamp, state, volume, song) ->
     let status = {timestamp; state; volume; song} in
     match view with
-    | Help_view -> Lwt.return_ok (Help { status; shortcuts})
+    | Help_view -> Lwt.return_ok (Help { status; shortcuts; render})
     | Queue_view ->
       MOS.fetch_queue_list ~client ()
       >>= fun plist -> Lwt.return_ok (Queue { status;
                                               plist;
                                               selected = 0;
-                                              shortcuts
+                                              shortcuts;
+                                              render;
                                             })
     | Music_db_view ->
       fetch_music_db client 0 0 0
@@ -68,7 +69,8 @@ let create ?(view=Queue_view) client shortcuts =
       | Error message -> Lwt.return_error message
       | Ok  db -> Lwt.return_ok (Music_db { status;
                                             db;
-                                            shortcuts
+                                            shortcuts;
+                                            render;
                                           })
 
 let force_update idata client =
@@ -78,16 +80,17 @@ let force_update idata client =
   | Ok (timestamp, state, volume, song) ->
     let status = {timestamp; state; volume; song} in
     match idata with
-    | Help {status = _; shortcuts} -> Lwt.return_ok (Help {status; shortcuts})
-    | Queue {status = _; plist; selected; shortcuts} ->
+    | Help {status = _; shortcuts; render} ->
+      Lwt.return_ok (Help {status; shortcuts; render})
+    | Queue {status = _; plist; selected; shortcuts; render} ->
       MOS.fetch_queue_list ~client ()
       >>= fun plist ->
-      Lwt.return_ok (Queue {status; plist; selected; shortcuts})
-    | Music_db {status = _; db; shortcuts} ->
+      Lwt.return_ok (Queue {status; plist; selected; shortcuts; render})
+    | Music_db {status = _; db; shortcuts; render} ->
       fetch_music_db client db.artist.selected db.album.selected db.song.selected
       >>= function
       | Error message -> Lwt.return_error message
-      | Ok db -> Lwt.return_ok (Music_db {status; db; shortcuts})
+      | Ok db -> Lwt.return_ok (Music_db {status; db; shortcuts; render})
 
 let update idata client =
   let now = Unix.time () in
@@ -97,8 +100,8 @@ let update idata client =
     Mpd.Client_lwt.noidle client
     >>= fun _ ->
     match internal_data with
-    | Help {status; shortcuts} -> Lwt.return_ok internal_data
-    | Queue {status; plist; selected; shortcuts} ->
+    | Help {status; shortcuts; render} -> Lwt.return_ok internal_data
+    | Queue {status; plist; selected; shortcuts; render} ->
       let prev = status.timestamp in
       if ((now -. prev) > 1.0) then
         MOS.fetch_queue_list ~client ()
@@ -108,7 +111,7 @@ let update idata client =
         | Error message -> Lwt.return_error message
         | Ok (timestamp, state, volume, song) ->
           let status = {timestamp; state; volume; song} in
-          Lwt.return_ok (Queue {status; plist; selected; shortcuts})
+          Lwt.return_ok (Queue {status; plist; selected; shortcuts; render})
       else Lwt.return_ok internal_data
     | Music_db {status; db; shortcuts} ->
       let prev = status.timestamp in
@@ -124,5 +127,5 @@ let update idata client =
           end
           >>= function
           | Error message -> Lwt.return_error message
-          | Ok db -> Lwt.return_ok (Music_db {status = s; db; shortcuts})
+          | Ok db -> Lwt.return_ok (Music_db {status = s; db; shortcuts; render})
       else Lwt.return_ok internal_data

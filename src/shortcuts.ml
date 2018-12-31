@@ -58,19 +58,19 @@ let queue events client ev_mpd idata =
   | _ -> Lwt.return View.False
 
 let global events client t idata =
-  let switch view shortcuts =
+  let switch view shortcuts render =
     Lwt.cancel t;
     Mpd.Client_lwt.noidle client
     >>= fun _ ->
-    View_manager.create ~view client shortcuts
+    View_manager.create ~view client shortcuts render
     >>= function
     | Error _ -> Lwt.return View.False
     | Ok idata' -> Lwt.return (View.WithUpdate idata')
   in
   match events with
-  | `Key (`ASCII '0', []) -> switch View.Help_view none
-  | `Key (`ASCII '1', []) -> switch View.Queue_view queue
-  | `Key (`ASCII '2', []) -> switch View.Music_db_view none
+  | `Key (`ASCII '0', []) -> switch View.Help_view none Drawing.help
+  | `Key (`ASCII '1', []) -> switch View.Queue_view queue Drawing.queue
+  | `Key (`ASCII '2', []) -> switch View.Music_db_view none Drawing.music_db
   | `End
   | `Key (`Escape, [])
   | `Key (`ASCII 'C', [`Ctrl])

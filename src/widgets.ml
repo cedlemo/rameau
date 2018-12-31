@@ -199,6 +199,12 @@ let gen_help_view (w, h) =
        ]
   |> Lwt.return
 
+let error msg =
+  I.(string A.(fg red) msg)
+
+let none () =
+  error "none"
+
 let render internal_data (w, h) =
   match internal_data with
   | Error message ->

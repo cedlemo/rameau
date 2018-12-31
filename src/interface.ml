@@ -54,7 +54,7 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
   (ev_term <?> ev_mpd) >>= function
   | `Mpd_event event_name -> begin
       begin match idata with
-        | Error _ -> View_manager.create client Shortcuts.queue
+        | Error _ -> View_manager.create client Shortcuts.queue Drawing.queue
         | Ok d -> View_manager.force_update d client
       end
       >>= fun idata' ->
@@ -88,7 +88,7 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
 let create client =
   let term = Terminal.create () in
   let size = Terminal.size term in
-  View_manager.create client Shortcuts.queue
+  View_manager.create client Shortcuts.queue Drawing.queue
   >>= fun internal_data ->
   render internal_data size
   >>= fun img ->
