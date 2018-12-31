@@ -40,9 +40,17 @@ let result_status_playlist_length = function
       | Ok p -> List.length p
       | _ -> 0
 
+let render_img idata dim =
+  match idata with
+  | Error message ->
+    let err_message = Printf.sprintf "[render internal data]: %s" message in
+    Loggin.err err_message
+    >>= fun () -> let img = Widgets.error err_message in Lwt.return img
+  | Ok idata' -> View.render idata' dim
+
 let rec loop term (ev_term, ev_mpd) dim client idata =
   let render_and_loop term events idata dim client =
-    render idata dim
+    render_img idata dim
     >>= fun img ->
     Terminal.image term img
     >>= fun () ->
@@ -89,10 +97,10 @@ let create client =
   let term = Terminal.create () in
   let size = Terminal.size term in
   View_manager.create client Shortcuts.queue Drawing.queue
-  >>= fun internal_data ->
-  render internal_data size
+  >>= fun idata ->
+  render_img idata size
   >>= fun img ->
   Terminal.image term img
   >>= fun () ->
   let events = event term, listen_mpd_event client in
-  loop term events size client internal_data
+  loop term events size client idata

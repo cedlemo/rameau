@@ -204,31 +204,3 @@ let error msg =
 
 let none () =
   error "none"
-
-let render internal_data (w, h) =
-  match internal_data with
-  | Error message ->
-    let err_message = Printf.sprintf "[render internal data]: %s" message in
-    Loggin.err err_message
-    >>= fun () ->
-    Lwt.return I.(string A.(fg red) err_message)
-  | Ok data ->
-    let title_bar = gen_title_bar data (w,h) in
-    begin
-      match data with
-      | Help {status} ->
-        gen_help_view (w, h)
-      | Music_db {status; db} ->
-        let view_port_height =  h - I.(height title_bar) in
-        gen_pan_list db.artist ((w - 3) / 3, view_port_height) "No artist(s)"
-        >>= fun artists ->
-        gen_pan_list db.album ((w - 3) / 3, view_port_height) "No album(s)"
-        >>= fun albums ->
-        gen_pan_list db.song ((w - 3) / 3, view_port_height) "No song(s)"
-        >>= fun songs ->
-        Lwt.return (I.hcat [artists; albums; songs])
-      | Queue {status; plist; selected} ->
-        let view_port_height =  h - I.(height title_bar) in
-        gen_playlist_img selected plist status.song (w, view_port_height)
-    end
-    >>= fun view -> Lwt.return I.(title_bar <-> view)
