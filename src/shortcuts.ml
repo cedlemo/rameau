@@ -31,4 +31,24 @@ let queue events client t idata =
     >>= fun _ -> Lwt.return true
   | _ -> Lwt.return false
 
-
+let global events client t idata =
+  let switch view shortcuts =
+    Lwt.cancel t;
+    Mpd.Client_lwt.noidle client
+    >>= fun _ ->
+    View_manager.create ~view client shortcuts
+    >>= function
+    | Error _ -> Lwt.return False
+    | Ok idata' -> Lwt.return (WithUpdate idata')
+  in
+  match events with
+  | `Key (`ASCII '0', []) -> switch View.Help_view none
+  | `Key (`ASCII '1', []) -> switch View.Queue_view queue
+  | `Key (`ASCII '2', []) -> switch View.Music_db_view none
+  | `End
+  | `Key (`Escape, [])
+  | `Key (`ASCII 'C', [`Ctrl])
+  | `Key (`ASCII 'q', []) ->
+    Commands.rameau_quit client
+    >>= fun () -> Lwt.return True
+  | _ -> Lwt.return False

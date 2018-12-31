@@ -49,7 +49,7 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
   (ev_term <?> ev_mpd) >>= function
   | `Mpd_event event_name -> begin
     begin match idata with
-          | Error _ -> View_manager.create client
+          | Error _ -> View_manager.create client Shortcuts.queue
           | Ok d -> View_manager.force_update d client
     end
     >>= fun idata' ->
@@ -74,7 +74,7 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
     >>= function
     | true ->  loop term (new_events ()) dim client idata
     | false ->
-      Global_shortcuts.global other_keys client ev_mpd idata'
+      Shortcuts.global other_keys client ev_mpd idata'
       >>= function
       | Shortcuts.True -> loop term (new_events ()) dim client idata
       | Shortcuts.WithUpdate idata' ->
@@ -85,7 +85,7 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
 let create client =
   let term = Terminal.create () in
   let size = Terminal.size term in
-  View_manager.create client
+  View_manager.create client Shortcuts.queue
   >>= fun internal_data ->
     render internal_data size
     >>= fun img ->

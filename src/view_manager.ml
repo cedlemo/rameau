@@ -47,20 +47,20 @@ let fetch_music_db client artist_sel album_sel song_sel =
                          song = songs_pan} in
         Lwt.return_ok music_db
 
-let create ?(view=Queue_view) client =
+let create ?(view=Queue_view) client shortcuts =
   MOS.fetch_status ~client ()
   >>= function
   | Error message -> Lwt.return_error message
   | Ok (timestamp, state, volume, song) ->
     let status = {timestamp; state; volume; song} in
     match view with
-    | Help_view -> Lwt.return_ok (Help { status; shortcuts = Shortcuts.none})
+    | Help_view -> Lwt.return_ok (Help { status; shortcuts})
     | Queue_view ->
       MOS.fetch_queue_list ~client ()
       >>= fun plist -> Lwt.return_ok (Queue { status;
                                               plist;
                                               selected = 0;
-                                              shortcuts = Shortcuts.queue
+                                              shortcuts
                                             })
     | Music_db_view ->
       fetch_music_db client 0 0 0
@@ -68,7 +68,8 @@ let create ?(view=Queue_view) client =
       | Error message -> Lwt.return_error message
       | Ok  db -> Lwt.return_ok (Music_db { status;
                                             db;
-                                            shortcuts = Shortcuts.none })
+                                            shortcuts
+                                          })
 
 let force_update idata client =
   MOS.fetch_status ~client ()

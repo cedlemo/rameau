@@ -18,7 +18,7 @@
 
 (** Module that manage the creation, update of Views. *)
 val create:
-  ?view:View.desc -> Mpd.Client_lwt.t -> (View.t, string) Result.result Lwt.t
+  ?view:View.desc -> Mpd.Client_lwt.t -> View.shortcuts -> (View.t, string) Result.result Lwt.t
 (** Create / fill internal data. *)
 val force_update:
 View.t -> Mpd.Client_lwt.t -> (View.t, string) Result.result Lwt.t
