@@ -55,7 +55,13 @@ shortcuts = [ `End
             | `Mouse of Notty.Unescape.mouse
             | `Mpd_event of (string, string) result
             | `Paste of Notty.Unescape.paste
-            | `Resize of int * int ] Lwt.t -> t -> bool Lwt.t
+            | `Resize of int * int ] Lwt.t -> t -> event_handled Lwt.t
+and event_handled = False | True | WithUpdate of t
+(* Type that describe a rameau event has been handled:
+ * false if the function did not respond to the event
+ * True if the function responded to the event
+ * WithUpdate if the function responded to the event and updated the internal
+ * data *)
 
 val get_status: t -> status
 (** Get the status data from the internal data. *)

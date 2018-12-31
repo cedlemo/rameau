@@ -72,14 +72,14 @@ let rec loop term (ev_term, ev_mpd) dim client idata =
     let shortcuts = get_shortcuts idata' in
     shortcuts other_keys  client ev_mpd idata'
     >>= function
-    | true ->  loop term (new_events ()) dim client idata
-    | false ->
+    | View.WithUpdate _ | View.True ->  loop term (new_events ()) dim client idata
+    | View.False ->
       Shortcuts.global other_keys client ev_mpd idata'
       >>= function
-      | Shortcuts.True -> loop term (new_events ()) dim client idata
-      | Shortcuts.WithUpdate idata' ->
+      | View.True -> loop term (new_events ()) dim client idata
+      | View.WithUpdate idata' ->
         render_and_loop term (new_events ()) (Ok idata') dim client
-      | Shortcuts.False ->
+      | View.False ->
       render_and_loop term (event term, ev_mpd) idata dim client
 
 let create client =

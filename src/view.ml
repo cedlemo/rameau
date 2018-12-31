@@ -56,7 +56,8 @@ shortcuts = [ `End
             | `Mouse of Notty.Unescape.mouse
             | `Mpd_event of (string, string) result
             | `Paste of Notty.Unescape.paste
-            | `Resize of int * int ] Lwt.t -> t -> bool Lwt.t
+            | `Resize of int * int ] Lwt.t -> t -> event_handled Lwt.t
+and event_handled = False | True | WithUpdate of t
 
 let view_name = function
   | Queue _ -> "Queue"

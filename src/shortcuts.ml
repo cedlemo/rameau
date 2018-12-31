@@ -1,35 +1,28 @@
 open Lwt.Infix
 open View
 
-type event_handled = False | True | WithUpdate of View.t
-(* Type that describe a rameau event has been handled:
- * false if the function did not respond to the event
- * True if the function responded to the event
- * WithUpdate if the function responded to the event and updated the internal
- * data *)
-
 let none events client t idata =
   match events with
-  | _-> Lwt.return false
+  | _-> Lwt.return View.False
 
 let queue events client t idata =
   match events with
   | `Key (`Enter, [])     ->
     Lwt.cancel t; Commands.rameau_play client idata
-    >>= fun _ -> Lwt.return true
+    >>= fun _ -> Lwt.return View.True
   | `Key (`ASCII 's', []) ->
     Lwt.cancel t; Commands.rameau_stop client idata
-    >>= fun _ -> Lwt.return true
+    >>= fun _ -> Lwt.return View.True
   | `Key (`ASCII 'p', []) ->
     Lwt.cancel t; Commands.rameau_toggle_pause client idata
-    >>= fun _ -> Lwt.return true
+    >>= fun _ -> Lwt.return View.True
   | `Key (`ASCII '+', []) ->
     Lwt.cancel t; Commands.rameau_inc_vol client idata
-    >>= fun _ -> Lwt.return true
+    >>= fun _ -> Lwt.return View.True
   | `Key (`ASCII '-', []) ->
     Lwt.cancel t; Commands.rameau_decr_vol client idata
-    >>= fun _ -> Lwt.return true
-  | _ -> Lwt.return false
+    >>= fun _ -> Lwt.return View.True
+  | _ -> Lwt.return View.False
 
 let global events client t idata =
   let switch view shortcuts =
@@ -38,8 +31,8 @@ let global events client t idata =
     >>= fun _ ->
     View_manager.create ~view client shortcuts
     >>= function
-    | Error _ -> Lwt.return False
-    | Ok idata' -> Lwt.return (WithUpdate idata')
+    | Error _ -> Lwt.return View.False
+    | Ok idata' -> Lwt.return (View.WithUpdate idata')
   in
   match events with
   | `Key (`ASCII '0', []) -> switch View.Help_view none
@@ -50,5 +43,5 @@ let global events client t idata =
   | `Key (`ASCII 'C', [`Ctrl])
   | `Key (`ASCII 'q', []) ->
     Commands.rameau_quit client
-    >>= fun () -> Lwt.return True
-  | _ -> Lwt.return False
+    >>= fun () -> Lwt.return View.True
+  | _ -> Lwt.return View.False
