@@ -54,14 +54,6 @@ let gen_volume_img s =
 (** Assemble a list of list of Notty.image in a grid image *)
 let grid xxs = xxs |> List.map I.hcat |> I.vcat
 
-(** Organize ascii code for decorations of the same kind *)
-type ascii_corners =
-  { tl: Notty.image; (** top left *)
-    tr: Notty.image; (** top right *)
-    bl: Notty.image; (** bottom left *)
-    br: Notty.image; (** bottom right *)
-  }
-
 let gen_title_bar internal_data (w,h) =
   let _gen_title_bar s view_name =
     let attr = A.(fg lightgreen ) in
